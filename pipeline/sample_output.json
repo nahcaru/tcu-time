@@ -1,7 +1,10 @@
 {
   "academic_year": 2025,
   "total_courses": 199,
-  "enriched_count": 5,
+  "curriculum_codes_fetched": 263,
+  "curriculum_codes_for_year": 17,
+  "enriched_count": 3,
+  "total_metadata_rows": 8,
   "enriched_courses": [
     {
       "code": "smab020161",
@@ -34,13 +37,22 @@
         }
       ],
       "notes": "",
-      "metadata": {
-        "curriculum_code": "default",
-        "category": "授業科目",
-        "compulsoriness": null,
-        "credits": 2.0,
-        "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab020161"
-      }
+      "metadata": [
+        {
+          "curriculum_code": "default",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab020161"
+        },
+        {
+          "curriculum_code": "sm250201",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab020161&value(crclumcd)=sm250201"
+        }
+      ]
     },
     {
       "code": "smab070041",
@@ -73,13 +85,29 @@
         }
       ],
       "notes": "",
-      "metadata": {
-        "curriculum_code": "default",
-        "category": "授業科目",
-        "compulsoriness": null,
-        "credits": 2.0,
-        "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab070041"
-      }
+      "metadata": [
+        {
+          "curriculum_code": "default",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab070041"
+        },
+        {
+          "curriculum_code": "sd250701",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab070041&value(crclumcd)=sd250701"
+        },
+        {
+          "curriculum_code": "sm250701",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab070041&value(crclumcd)=sm250701"
+        }
+      ]
     },
     {
       "code": "smab000091",
@@ -112,91 +140,29 @@
         }
       ],
       "notes": "",
-      "metadata": {
-        "curriculum_code": "default",
-        "category": "授業科目",
-        "compulsoriness": null,
-        "credits": 2.0,
-        "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab000091"
-      }
-    },
-    {
-      "code": "smab020181",
-      "name": "材料強度学特論",
-      "instructors": [
-        "熊谷 正芳"
-      ],
-      "year_level": 1,
-      "class_section": "",
-      "schedules": [
+      "metadata": [
         {
-          "term": "前期後",
-          "day": "月",
-          "period": 1,
-          "room": "1BP"
+          "curriculum_code": "default",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab000091"
         },
         {
-          "term": "前期後",
-          "day": "木",
-          "period": 1,
-          "room": "1BP"
-        }
-      ],
-      "target_raw": "対象[02機械/23以降入学生対象]",
-      "targets": [
-        {
-          "target_code": "02",
-          "target_name": "機械",
-          "note": "23以降入学生対象"
-        }
-      ],
-      "notes": "",
-      "metadata": {
-        "curriculum_code": "default",
-        "category": "授業科目",
-        "compulsoriness": null,
-        "credits": 2.0,
-        "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab020181"
-      }
-    },
-    {
-      "code": "smab090221",
-      "name": "VLSI回路設計特論",
-      "instructors": [
-        "中野 秀洋"
-      ],
-      "year_level": 1,
-      "class_section": "",
-      "schedules": [
-        {
-          "term": "前期後",
-          "day": "月",
-          "period": 1,
-          "room": "1BE"
+          "curriculum_code": "sd250101",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab000091&value(crclumcd)=sd250101"
         },
         {
-          "term": "前期後",
-          "day": "木",
-          "period": 1,
-          "room": "1BE"
+          "curriculum_code": "sd250301",
+          "category": "授業科目",
+          "compulsoriness": null,
+          "credits": 2.0,
+          "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab000091&value(crclumcd)=sd250301"
         }
-      ],
-      "target_raw": "対象[09情報]",
-      "targets": [
-        {
-          "target_code": "09",
-          "target_name": "情報",
-          "note": ""
-        }
-      ],
-      "notes": "",
-      "metadata": {
-        "curriculum_code": "default",
-        "category": "授業科目",
-        "compulsoriness": null,
-        "credits": 2.0,
-        "syllabus_url": "https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do?value(risyunen)=2025&value(semekikn)=1&value(kougicd)=smab090221"
-      }
+      ]
     }
   ],
   "all_courses": [

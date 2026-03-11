@@ -53,15 +53,13 @@ CREATE TABLE course_targets (
   PRIMARY KEY(course_id, target_code)
 );
 
--- Course metadata: per curriculum code (from syllabus scraping)
+-- Course metadata: enriched from syllabus scraping
 CREATE TABLE course_metadata (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   course_id       UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  curriculum_code TEXT NOT NULL,
+  curriculum_code TEXT NOT NULL DEFAULT 'default',
   category        TEXT,
-  compulsoriness  TEXT,
   credits         DECIMAL(3,1),
-  syllabus_url    TEXT,
   UNIQUE(course_id, curriculum_code)
 );
 

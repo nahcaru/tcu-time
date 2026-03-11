@@ -175,9 +175,7 @@ def upsert_metadata(
         "course_id": course_id,
         "curriculum_code": curriculum_code,
         "category": metadata.get("category"),
-        "compulsoriness": metadata.get("compulsoriness"),
         "credits": metadata.get("credits"),
-        "syllabus_url": metadata.get("syllabus_url"),
     }
     result = (
         get_client()
@@ -189,7 +187,7 @@ def upsert_metadata(
 
 
 def get_courses_needing_enrichment() -> list[Row]:
-    """Get extracted courses with targets and existing metadata codes."""
+    """Get extracted courses that have no metadata row yet."""
     client = get_client()
 
     # Get all courses that belong to an extraction
@@ -201,18 +199,20 @@ def get_courses_needing_enrichment() -> list[Row]:
     )
     courses = cast(list[Row], result.data)
 
+    # Filter to those without any metadata
+    needing: list[Row] = []
     for course in courses:
         meta_result = (
             client.table("course_metadata")
-            .select("curriculum_code")
+            .select("id")
             .eq("course_id", course["id"])
+            .limit(1)
             .execute()
         )
-        course["existing_metadata_codes"] = [
-            cast(str, r["curriculum_code"]) for r in cast(list[Row], meta_result.data)
-        ]
+        if not meta_result.data:
+            needing.append(course)
 
-    return courses
+    return needing
 
 
 # ---------------------------------------------------------------------------

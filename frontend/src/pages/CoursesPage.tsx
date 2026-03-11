@@ -2,7 +2,7 @@
  * 科目一覧画面 (/)
  *
  * Default screen. Course search, filter, and list.
- * Components: FilterPanel, SearchBar, CourseList, CourseCard, CourseDialog
+ * Components: FilterPanel (target/term/category), SearchBar, CourseList, CourseCard, CourseDialog
  */
 export function CoursesPage() {
   return (

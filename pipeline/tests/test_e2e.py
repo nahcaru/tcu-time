@@ -30,7 +30,6 @@ from ..extractor import (
 from ..enricher import (
     enrich_courses,
     scrape_syllabus,
-    SyllabusFields,
 )
 from ..models import ExtractedCourse, CourseMetadata
 

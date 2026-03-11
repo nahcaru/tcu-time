@@ -83,9 +83,7 @@ class ExtractedCourse(BaseModel):
 class CourseMetadata(BaseModel):
     curriculum_code: str
     category: str | None = None
-    compulsoriness: str | None = None
     credits: float | None = None
-    syllabus_url: str | None = None
 
 
 class ExtractionResult(BaseModel):

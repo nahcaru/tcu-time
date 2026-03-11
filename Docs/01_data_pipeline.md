@@ -20,7 +20,7 @@ graph TD
 
     subgraph "③ エンリッチ (Enrich)"
         DB -->|承認済み科目| SC[シラバススクレイパー]
-        SC -->|分類・単位・必選| DB
+        SC -->|分類・単位| DB
     end
 
     subgraph "④ 管理 (Admin)"
@@ -198,7 +198,9 @@ def carry_forward(rows):
 
 ### シラバスデータの必要性
 
-PDF 時間割には分類（専門/共通等）、単位数、必修/選択の情報が含まれない。これらはシラバスページから科目 × カリキュラムコードごとにスクレイピングする。
+PDF 時間割には分類（専門/共通等）と単位数の情報が含まれない。これらはシラバスページから科目ごとにスクレイピングする。
+
+> **注**: 大学院シラバスでは必修/選択（compulsoriness）は常に null のため取得対象外。カリキュラムコードによるメタデータの差異もないため、1 科目 1 回のスクレイピングに簡略化済み。
 
 ### シラバス API
 
@@ -207,48 +209,29 @@ GET https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do
   ?value(risyunen)=2025          # 年度
   &value(semekikn)=1             # 学期フラグ
   &value(kougicd)={course_code}   # 例: smab020161
-  &value(crclumcd)={curriculum}   # 例: s24310
 ```
 
 レスポンス: HTML ページ、`<table class="syllabus_detail">` 内:
-- 行 8: `[分類・必選]` (例: `[専門・選択]`)
-- 行 16: 単位数 (例: `2`)
+- `■分類■` 行: 分類 (例: `専門`)
+- 単位数行: 単位数 (例: `2`)
 
-### カリキュラムコード取得
-
-```
-GET https://websrv.tcu.ac.jp/tcu_web_v3/slbsscmr.do
-```
-
-このページから総合理工学研究科の全カリキュラムコードを取得し、フィルタリング用のコード一覧を構築する。
-
-### スクレイピングロジック（レガシー互換）
+### スクレイピングロジック
 
 ```python
-for course in courses:
-    for curriculum_code in GRAD_CURRICULUM_CODES:
-        # ホワイトリスト方式: target のプレフィックスでフィルタ
-        if any(curriculum_code.startswith(t) for t in course.targets):
-            if curriculum_code not in course.metadata:
-                category, compulsory, credits = scrape_syllabus(
-                    year=2025,
-                    code=course.code,
-                    curriculum=curriculum_code
-                )
-                db.upsert_metadata(course.id, curriculum_code, {
-                    "category": category,
-                    "compulsoriness": compulsory,
-                    "credits": credits
-                })
-                time.sleep(3)  # レート制限
+for course in courses_needing_enrichment:
+    fields = scrape_syllabus(year=2025, code=course.code)
+    db.upsert_metadata(course.id, "default", {
+        "category": fields.category,
+        "credits": fields.credits,
+    })
+    time.sleep(3)  # レート制限
 ```
 
-### エンリッチフィールド（カリキュラムコードごと）
+### エンリッチフィールド
 
 | フィールド | 型 | 例 |
 |---|---|---|
 | `category` | text | `専門`, `共通`, `英語` |
-| `compulsoriness` | text | `必修`, `選択`, `選択必修` |
 | `credits` | decimal | `2.0`, `0.5` |
 
 ### TLS 対応
