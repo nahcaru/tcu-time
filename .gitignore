@@ -51,6 +51,5 @@ Thumbs.db
 pipeline/downloads/
 pipeline/*.pdf
 
-# === Lock files (keep bun.lock, ignore others) ===
-# bun.lock is tracked
-uv.lock
+# === Lock files ===
+# bun.lock and uv.lock are tracked for reproducible CI

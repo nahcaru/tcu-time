@@ -1,46 +1,44 @@
 name: Course Data Pipeline
+
 on:
   schedule:
-    - cron: '0 21 * * *' # 06:00 JST (UTC+9)
+    - cron: "0 21 * * *" # 06:00 JST (UTC+9)
   workflow_dispatch:
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
 
 jobs:
   pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: pipeline
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
       - name: Install dependencies
-        run: uv sync
-        working-directory: pipeline
+        run: uv sync --frozen
 
-      - name: Run monitor
+      - name: Check for PDF updates
         run: uv run python -m pipeline.monitor
-        working-directory: pipeline
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-      - name: Run extractor
+      - name: Extract courses from PDF
         run: uv run python -m pipeline.extractor
-        working-directory: pipeline
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-      - name: Run enricher
+      - name: Enrich courses from syllabus
         run: uv run python -m pipeline.enricher
-        working-directory: pipeline
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
