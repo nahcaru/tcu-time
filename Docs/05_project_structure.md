@@ -45,14 +45,19 @@ TIME/
 │
 ├── pipeline/                      # データパイプライン (Python)
 │   ├── __init__.py
+│   ├── main.py                    # オーケストレーター
 │   ├── monitor.py                 # Web サイト監視 + PDF ダウンロード
-│   ├── extractor.py               # pdfplumber + Gemini 抽出
+│   ├── classifier.py              # Gemini ページ分類 + ヘッダー検出
+│   ├── extractor.py               # pdfplumber + Gemini 構造化抽出
+│   ├── changelog.py               # 変更一覧の解析 + 差分適用
+│   ├── advance.py                 # 先行履修 PDF → フラグ更新
 │   ├── enricher.py                # シラバススクレイピング
 │   ├── models.py                  # データクラス (Pydantic)
 │   ├── db.py                      # Supabase クライアント
 │   ├── config.py                  # 設定 (環境変数)
 │   ├── tests/
 │   │   ├── test_extractor.py
+│   │   ├── test_changelog.py
 │   │   ├── test_enricher.py
 │   │   └── fixtures/              # テスト用 PDF、HTML サンプル
 │   ├── pyproject.toml             # uv プロジェクト設定

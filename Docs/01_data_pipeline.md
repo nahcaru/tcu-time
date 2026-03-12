@@ -2,7 +2,7 @@
 
 ## 概要
 
-レガシー版の 3 ステップ手動パイプライン（GAS → スプレッドシート → Python）を、LLM を活用した自動パイプラインに置き換える。
+レガシー版の 3 ステップ手動パイプライン（GAS → スプレッドシート → Python）を、LLM を活用した自動パイプラインに置き換える。科目データは Supabase DB に直接保存し、フロントエンドは PostgREST API 経由で取得する（静的 JSON の生成・デプロイは不要）。
 
 ```mermaid
 graph TD
@@ -11,21 +11,110 @@ graph TD
         W -->|PDFリンク差分検知| DL[PDF ダウンロード]
     end
 
-    subgraph "② 抽出 (Extract)"
-        DL -->|PDF| PB[pdfplumber<br/>テキスト抽出]
-        PB -->|生テキスト + 表構造| LLM[Gemini 3.1 Flash-Lite<br/>構造化]
-        LLM -->|JSON| V[バリデーション]
-        V -->|status: pending| DB[(Supabase DB)]
+    subgraph "② 分類 (Classify)"
+        DL -->|PDF| CL[Gemini: ページ分類<br/>表ページを特定]
+        CL -->|表ページ番号| EX[抽出へ]
     end
 
-    subgraph "③ エンリッチ (Enrich)"
+    subgraph "③ 抽出 (Extract)"
+        EX -->|表ページ| PB[pdfplumber<br/>テキスト抽出]
+        PB -->|生テキスト + 表構造| LLM[Gemini: 構造化<br/>ヘッダー自動認識]
+        LLM -->|JSON| V[バリデーション]
+    end
+
+    subgraph "④ 統合 (Merge)"
+        V -->|時間表データ| MG{PDF種別?}
+        MG -->|時間表| DB[(Supabase DB)]
+        MG -->|変更一覧| DIFF[差分適用]
+        DIFF --> DB
+    end
+
+    subgraph "⑤ エンリッチ (Enrich)"
         DB -->|承認済み科目| SC[シラバススクレイパー]
         SC -->|分類・単位| DB
     end
+```
 
-    subgraph "④ 管理 (Admin)"
-        ADMIN[管理画面] -->|確認・承認・再抽出| DB
-    end
+---
+
+## PDF ライフサイクル
+
+### 年間の PDF 公開パターン
+
+```
+3月頃  ─── 初版 PDF 公開 ───────────────────────────────────
+             ├── 前期 時間表 (確定)
+             └── 後期 時間表 (暫定)     ───── 同一 PDF 内
+                                              別ページ
+
+4月    ─── 前期 変更一覧 (随時更新) ──────── 別 PDF
+
+9月頃  ─── 後期 確定版 PDF 公開 ─────────── 別の新 PDF
+             └── 後期 時間表 (確定)         暫定版を上書き
+
+10月   ─── 後期 変更一覧 (随時更新) ──────── 別 PDF
+```
+
+### データの優先順位
+
+| 優先度 | ソース | 説明 |
+|---|---|---|
+| **1 (最高)** | 変更一覧 PDF | 個別科目の追加・削除・変更を上書き |
+| **2** | 確定版 時間表 | 後期は暫定版を完全に置換 |
+| **3 (最低)** | 暫定版 時間表 | 初版 PDF 内の後期ページ |
+
+### DB での管理
+
+`extractions` テーブルで各 PDF を追跡:
+
+```sql
+CREATE TABLE extractions (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pdf_url      TEXT NOT NULL,
+  pdf_hash     TEXT NOT NULL,
+  pdf_type     TEXT NOT NULL
+               CHECK (pdf_type IN ('timetable', 'changelog', 'advance_enrollment')),
+  semester     TEXT NOT NULL
+               CHECK (semester IN ('spring', 'fall')),
+  is_tentative BOOLEAN DEFAULT false,   -- 暫定版フラグ
+  academic_year INT NOT NULL,
+  status       TEXT DEFAULT 'pending'
+               CHECK (status IN ('pending','extracted','pending_review',
+                                  'approved','rejected')),
+  raw_json     JSONB,
+  error_log    TEXT,
+  reviewed_by  UUID REFERENCES auth.users(id),
+  created_at   TIMESTAMPTZ DEFAULT now(),
+  updated_at   TIMESTAMPTZ DEFAULT now()
+);
+```
+
+各科目にもソース情報を記録:
+
+```sql
+ALTER TABLE courses ADD COLUMN source_type TEXT DEFAULT 'timetable';
+-- 'timetable' = 時間表から抽出
+-- 'changelog' = 変更一覧から適用
+ALTER TABLE courses ADD COLUMN is_tentative BOOLEAN DEFAULT false;
+ALTER TABLE courses ADD COLUMN advance_enrollment BOOLEAN DEFAULT false;
+-- 先行履修可能な科目
+```
+
+### 後期確定版が公開された時の処理
+
+```python
+def handle_confirmed_fall_pdf(extraction):
+    """後期確定版 PDF で暫定データを完全に置換"""
+    # 1. 既存の暫定版後期データを削除
+    db.delete_courses(
+        semester='fall',
+        academic_year=extraction.academic_year,
+        is_tentative=True
+    )
+    # 2. 確定版データを投入
+    for course in extraction.courses:
+        course.is_tentative = False
+        db.upsert_course(course)
 ```
 
 ---
@@ -37,15 +126,32 @@ graph TD
 - URL: `https://www.asc.tcu.ac.jp/6509/`
 - WordPress 形式のページ、学部・大学院の PDF リンクを掲載
 - PDF URL パターン: `https://www.asc.tcu.ac.jp/wp-content/uploads/YYYY/MM/{hash}.pdf`
-- ページタイトルに更新日表示: `（後期情報 11/27更新）`
 
-### 監視対象 PDF（初期スコープ）
+### PDF 種別の自動判定
 
-| 区分 | PDF |
-|---|---|
-| 総合理工学研究科 前期 | 全専攻 前期 授業時間表 |
-| 総合理工学研究科 後期 | 全専攻 後期 授業時間表 |
-| 変更一覧 | 授業時間表変更一覧（随時更新） |
+リンクテキストや周辺のコンテキストから PDF の種別を推定:
+
+```python
+def classify_pdf_link(link_text: str, context: str) -> PDFMetadata:
+    """リンクテキストから PDF 種別・学期を推定"""
+    # パターンマッチング
+    if "変更一覧" in link_text or "変更" in link_text:
+        pdf_type = "changelog"
+    elif "先行履修" in link_text:
+        pdf_type = "advance_enrollment"
+    else:
+        pdf_type = "timetable"
+
+    if "前期" in link_text:
+        semester = "spring"
+    elif "後期" in link_text:
+        semester = "fall"
+    else:
+        # 両方含む場合や判定不能な場合は Gemini に判定を委譲
+        semester = classify_with_gemini(link_text, context)
+
+    return PDFMetadata(type=pdf_type, semester=semester)
+```
 
 ### 検知ロジック
 
@@ -56,130 +162,190 @@ def monitor():
     stored_links = db.get_stored_pdf_links()
 
     for link in current_links:
+        metadata = classify_pdf_link(link.text, link.context)
+
         if link.url not in stored_links:
-            # 新規 PDF
-            download_and_queue(link)
-        elif link.url in stored_links and hash(download(link)) != stored_links[link.url].hash:
-            # 同一 URL だが内容変更
-            download_and_queue(link)
+            download_and_queue(link, metadata)
+        elif hash(download(link)) != stored_links[link.url].hash:
+            download_and_queue(link, metadata)
 ```
-
-### トリガー条件
-
-| 条件 | アクション |
-|---|---|
-| 新しい PDF URL を検知 | ダウンロード → 全抽出 |
-| 同一 URL で内容変更（ハッシュ不一致） | 再ダウンロード → 再抽出 |
-| 変更一覧 PDF 更新 | ダウンロード → 差分適用 |
-| 手動トリガー（管理画面から） | 任意の PDF を再抽出 |
 
 ### 実行スケジュール
 
-- **GitHub Actions cron**: 1 日 1 回（例: 毎日 06:00 JST）
+- **GitHub Actions cron**: 1 日 1 回（毎日 06:00 JST）
 - **手動ディスパッチ**: `workflow_dispatch` で任意タイミング実行可
-- **所要時間**: 通常 1〜2 分（変更なければ即終了）
 
 ---
 
-## ② LLM PDF 抽出 (`pipeline/extractor.py`)
+## ② Gemini ページ分類 (`pipeline/classifier.py`)
+
+> [!IMPORTANT]
+> PDF のページ構成や表のヘッダーは年度・学期によって変わる可能性がある。ハードコーディングを避け、Gemini に各ページの内容を分類させる。
+
+### なぜ必要か
+
+| 問題 | 例 |
+|---|---|
+| ページ番号が変わる | 2024: 表紙 2 ページ → 2025: 表紙 3 ページ |
+| 表構造が変わる | 列の追加・削除・順序変更 |
+| 新セクション追加 | 新専攻の追加でページ数変動 |
+
+### 分類フロー
+
+```python
+def classify_pages(pdf_path: str) -> list[PageClassification]:
+    """各ページを Gemini で分類し、表ページとヘッダーを特定"""
+    pdf = pdfplumber.open(pdf_path)
+
+    # Phase 1: 各ページの概要を取得
+    page_summaries = []
+    for i, page in enumerate(pdf.pages):
+        text = page.extract_text() or ""
+        tables = page.extract_tables()
+        has_table = len(tables) > 0
+        col_count = len(tables[0][0]) if tables and tables[0] else 0
+        page_summaries.append({
+            "page": i + 1,
+            "has_table": has_table,
+            "col_count": col_count,
+            "text_preview": text[:300]
+        })
+
+    # Phase 2: Gemini に一括分類させる
+    prompt = f"""
+以下は東京都市大学の授業時間表 PDF の各ページの概要です。
+各ページの種類を分類してください。
+
+分類カテゴリ:
+- "course_table_spring": 前期の科目テーブル
+- "course_table_fall": 後期の科目テーブル
+- "cover": 表紙・日程
+- "notes": 注意事項・学事暦
+- "schedule": スケジュール表
+- "map": キャンパスマップ
+- "manual": マニュアル
+- "other": その他
+
+各ページの概要:
+{json.dumps(page_summaries, ensure_ascii=False, indent=2)}
+
+各 course_table のページについては、テーブルのヘッダー行
+（列の並び順）も特定してください。
+
+JSON 形式で出力:
+[
+  {{
+    "page": 1,
+    "type": "cover",
+    "headers": null
+  }},
+  {{
+    "page": 7,
+    "type": "course_table_spring",
+    "headers": ["学科", "曜", "限", "学期", "年", "クラス",
+                "科目名", "担当者", "講義コード", "教室",
+                "受講対象", "備考"]
+  }}
+]
+"""
+    return gemini.generate(prompt, response_schema=PageClassifications)
+```
+
+### 変更一覧 PDF の分類
+
+変更一覧 PDF は時間表とは異なる構造を持つ。同様に Gemini で解析:
+
+```python
+def classify_changelog_pages(pdf_path: str) -> list[ChangelogPage]:
+    """変更一覧 PDF を解析し、各変更エントリを特定"""
+    # 変更一覧は通常 1〜2 ページ、表形式で:
+    # | 変更種別 | 学期 | 曜日 | 時限 | 科目名 | 変更内容 |
+    # のような構造
+    ...
+```
+
+---
+
+## ③ LLM PDF 抽出 (`pipeline/extractor.py`)
 
 ### ハイブリッドアプローチ
-
-TCU の時間割 PDF は機械生成（スキャン画像ではない）のため、テキスト埋め込みが利用可能。
 
 ```
 PDF ──→ pdfplumber ──→ 生テキスト + 表構造 ──→ LLM ──→ 構造化 JSON
          (無料・高速)    (セル配置を保持)          (文脈理解)
 ```
 
-| アプローチ | メリット | デメリット |
-|---|---|---|
-| 純粋ビジョン（PDF → 画像 → LLM） | シンプル | 高コスト（画像トークン）、セル境界の幻覚 |
-| 純粋テキスト（pdfplumber のみ） | 無料・高速・正確 | 結合セル、複雑レイアウトに弱い |
-| **ハイブリッド** ✅ | 両方の長所 | 若干コード量増 |
-
-**ハイブリッドのメリット**: テキストで送信するため画像の 10 分の 1 のトークンコスト。
-
 ### 使用モデル
 
 | モデル | 用途 |
 |---|---|
-| **Gemini 3.1 Flash-Lite** | メインモデル — 最速・低コスト・Gemini 3 シリーズ最新 |
+| **Gemini 3.1 Flash-Lite** | メイン — ページ分類・構造化のすべて |
 | Gemini 2.5 Flash | フォールバック — 3.1 で品質不足の場合 |
 
-### PDF 構造（総合理工学研究科）
+### 柔軟なヘッダーマッピング
 
-18 ページの PDF:
-
-| ページ | 内容 |
-|---|---|
-| 1 | 表紙 + 履修登録日程 |
-| 2 | 注意事項 |
-| 3 | 学事暦 |
-| 4 | イベント日程 |
-| 5–6 | 共同原子力専攻スケジュール |
-| **7–9** | **前期 科目テーブル（12 列、〜150 行）** |
-| **10–12** | **後期 科目テーブル（12 列、〜150 行）** |
-| 13–18 | マニュアル、キャンパスマップ |
-
-### テーブル列（12 列）
-
-| 列 | 名前 | 例 | 備考 |
-|---|---|---|---|
-| 1 | 学科 | `院総` | 多くは None（結合セル） |
-| 2 | 曜 | `月`, `火` | 前行引き継ぎの場合 None |
-| 3 | 限 | `1`–`5` | 同上 |
-| 4 | 学期 | `前期前`, `前期後`, `前期`, `前集中` | 同上 |
-| 5 | 年 | `1` | 大学院はほぼ 1 |
-| 6 | クラス | （通常空） | |
-| 7 | 科目名 | `ロボティクス特論` | |
-| 8 | 担当者 | `佐藤 大祐` | 複数人は改行区切り |
-| 9 | 講義コード | `smab020161` | ユニーク識別子 |
-| 10 | 教室 | `22A`, `渋谷サテライトクラス` | |
-| 11 | 受講対象 | `対象[09情報]` | `対象[XX 専攻名]` 形式 |
-| 12 | 備考 | `対開講(月1,木1)` | 対開講情報など |
-
-### 結合セルの処理
-
-pdfplumber は結合セルを `None` として返す。抽出後に carry-forward ロジックを適用:
+列名をハードコードせず、分類フェーズで得たヘッダー情報を LLM プロンプトに動的に組み込む:
 
 ```python
-def carry_forward(rows):
-    prev = {}
-    for row in rows:
-        for col in ["学科", "曜", "限", "学期", "年"]:
-            if row[col] is None:
-                row[col] = prev.get(col)
-            else:
-                prev[col] = row[col]
-    return rows
-```
+def extract_courses(pdf_path: str, page_classifications: list) -> list[Course]:
+    """分類済みページ情報を使って柔軟に抽出"""
+    pdf = pdfplumber.open(pdf_path)
+    all_courses = []
 
-### LLM プロンプト戦略
+    for pc in page_classifications:
+        if pc.type not in ("course_table_spring", "course_table_fall"):
+            continue
 
-```
-以下は東京都市大学の授業時間表から pdfplumber で抽出したテーブルデータです。
-各行を JSON オブジェクトとして構造化してください。
+        page = pdf.pages[pc.page - 1]
+        tables = page.extract_tables()
+        semester_hint = "spring" if "spring" in pc.type else "fall"
+
+        for table in tables:
+            raw_text = format_table_as_text(table)
+
+            prompt = f"""
+以下は東京都市大学の授業時間表から抽出したテーブルです。
+テーブルの列ヘッダーは以下の通りです:
+{json.dumps(pc.headers, ensure_ascii=False)}
+
+各行を以下の JSON スキーマに変換してください。
+ヘッダー名から適切なフィールドにマッピングしてください。
+結合セルで値が空の場合は、直前の行の値を引き継いでください。
 
 出力スキーマ:
-{
-  "code": "smab020161",
-  "name": "ロボティクス特論",
-  "instructors": ["佐藤 大祐"],
-  "day": "月",
-  "period": 1,
-  "term": "前期後",
-  "year_level": 1,
-  "class_section": "",
-  "room": "22A",
-  "target_raw": "対象[02機械]",
-  "paired_slots": "対開講(月1,木1)",
-  "notes": ""
-}
+{{
+  "code": "講義コード",
+  "name": "科目名",
+  "instructors": ["担当者"],
+  "day": "曜日 (月〜土)",
+  "period": "時限 (1-5の整数)",
+  "term": "学期",
+  "year_level": "対象学年 (整数)",
+  "class_section": "クラス",
+  "room": "教室",
+  "target_raw": "受講対象 (原文のまま)",
+  "notes": "備考 (対開講情報含む)"
+}}
 
 入力テーブル:
-{extracted_text}
+{raw_text}
+"""
+            courses = gemini.generate(prompt, response_schema=CourseList)
+            for c in courses:
+                c.semester = semester_hint
+            all_courses.extend(courses)
+
+    return all_courses
 ```
+
+### 結合セルの二重処理
+
+信頼性を高めるため、pdfplumber レベルと LLM レベルの両方で結合セルを処理する:
+
+1. **pdfplumber レベル**: Python の carry-forward ロジック（高速・確実）
+2. **LLM レベル**: プロンプトに「空セルは前行の値を引き継いで」と指示（文脈理解による補完）
+
+両方の結果を照合し、不一致があればログに記録。
 
 ### バリデーション
 
@@ -194,9 +360,105 @@ def carry_forward(rows):
 
 ---
 
-## ③ シラバスエンリッチ (`pipeline/enricher.py`)
+## ④ 変更一覧の処理 (`pipeline/changelog.py`)
 
-### シラバスデータの必要性
+### 変更一覧 PDF の構造
+
+変更一覧は時間表とは異なるフォーマットで、個別科目の変更情報を記載:
+
+```
+┌──────┬──────┬────┬────┬──────────┬────────────────┐
+│ 変更  │ 学期  │ 曜  │ 限  │ 科目名    │ 変更内容         │
+├──────┼──────┼────┼────┼──────────┼────────────────┤
+│ 追加  │ 前期後 │ 月  │ 3  │ ○○特論   │ 新規開講          │
+│ 変更  │ 前期  │ 火  │ 2  │ △△特論   │ 教室: 22A→14B    │
+│ 休講  │ 前期前 │ 水  │ 1  │ □□特論   │ 担当者都合により休講 │
+└──────┴──────┴────┴────┴──────────┴────────────────┘
+```
+
+### Gemini による変更解析
+
+変更一覧のフォーマットも年度で変わる可能性があるため、Gemini で柔軟に解析:
+
+```python
+def parse_changelog(pdf_path: str) -> list[ChangeEntry]:
+    """変更一覧 PDF を Gemini で解析"""
+    pdf = pdfplumber.open(pdf_path)
+    all_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    prompt = f"""
+以下は東京都市大学の授業時間表の変更一覧です。
+各変更エントリを JSON として出力してください。
+
+出力スキーマ:
+{{
+  "change_type": "add | modify | cancel",
+  "course_code": "講義コード (あれば)",
+  "course_name": "科目名",
+  "term": "学期",
+  "day": "曜日",
+  "period": "時限",
+  "changes": {{
+    "field": "変更対象フィールド",
+    "old_value": "変更前の値 (あれば)",
+    "new_value": "変更後の値"
+  }},
+  "reason": "変更理由 (あれば)"
+}}
+
+変更一覧テキスト:
+{all_text}
+"""
+    return gemini.generate(prompt, response_schema=ChangeEntryList)
+```
+
+### 差分適用ロジック
+
+```python
+def apply_changelog(changes: list[ChangeEntry], semester: str):
+    """変更一覧を既存データに適用"""
+    for change in changes:
+        if change.change_type == "add":
+            # 新規科目: DB に挿入 (source_type = 'changelog')
+            db.insert_course(change.to_course(), source_type="changelog")
+
+        elif change.change_type == "modify":
+            # 既存科目を特定して更新
+            course = db.find_course(
+                code=change.course_code,
+                name=change.course_name,
+                term=change.term,
+                day=change.day,
+                period=change.period
+            )
+            if course:
+                db.update_course_fields(course.id, change.changes)
+            else:
+                log.warning(f"変更対象の科目が見つかりません: {change}")
+
+        elif change.change_type == "cancel":
+            # 科目を削除 (or status='cancelled' に変更)
+            course = db.find_course(
+                name=change.course_name,
+                term=change.term
+            )
+            if course:
+                db.mark_cancelled(course.id, reason=change.reason)
+```
+
+### 科目の特定方法
+
+変更一覧には講義コードが含まれない場合もある。複数フィールドで照合:
+
+| 優先度 | 照合方法 |
+|---|---|
+| 1 | 講義コード (完全一致) |
+| 2 | 科目名 + 学期 + 曜日 + 時限 (複合一致) |
+| 3 | 科目名 + 学期 (部分一致) → 候補が複数なら管理者確認 |
+
+---
+
+## ⑤ シラバスエンリッチ (`pipeline/enricher.py`)
 
 PDF 時間割には分類（専門/共通等）と単位数の情報が含まれない。これらはシラバスページから科目ごとにスクレイピングする。
 
@@ -206,9 +468,9 @@ PDF 時間割には分類（専門/共通等）と単位数の情報が含まれ
 
 ```
 GET https://websrv.tcu.ac.jp/tcu_web_v3/slbssbdr.do
-  ?value(risyunen)=2025          # 年度
-  &value(semekikn)=1             # 学期フラグ
-  &value(kougicd)={course_code}   # 例: smab020161
+  ?value(risyunen)=2025
+  &value(semekikn)=1
+  &value(kougicd)={course_code}
 ```
 
 レスポンス: HTML ページ、`<table class="syllabus_detail">` 内:
@@ -227,53 +489,105 @@ for course in courses_needing_enrichment:
     time.sleep(3)  # レート制限
 ```
 
-### エンリッチフィールド
-
-| フィールド | 型 | 例 |
-|---|---|---|
-| `category` | text | `専門`, `共通`, `英語` |
-| `credits` | decimal | `2.0`, `0.5` |
-
 ### TLS 対応
-
-`websrv.tcu.ac.jp` は古い TLS 設定のため、Python `requests` でアクセス時に TLS エラーが発生する場合がある:
 
 ```python
 import requests
 import urllib3
 urllib3.disable_warnings()
-
 response = requests.get(url, verify=False, headers=headers)
-# または、カスタム TLS アダプターを使用
 ```
 
 ---
 
-## ④ パイプライン状態管理
+## ⑥ 先行履修リスト処理 (`pipeline/advance.py`)
 
-### 抽出ステータスフロー
+### 概要
+
+授業時間表ページの下部に「先行履修について」のリンクで別 PDF が掲示されている。この PDF 内の表に先行履修が可能な科目の「授業科目名」がリストアップされている（授業科目区分は使用しない）。
+
+### 抽出フロー
+
+```python
+def extract_course_names(pdf_path: str) -> list[str]:
+    """先行履修 PDF から科目名リストを Gemini で抽出"""
+    pdf = pdfplumber.open(pdf_path)
+    all_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    prompt = f"""
+以下は東京都市大学の先行履修に関する PDF から抽出したテキストです。
+先行履修が可能な授業科目名をすべてリストアップしてください。
+授業科目区分は不要です。科目名のみを JSON 配列で出力してください。
+
+入力テキスト:
+{all_text}
+"""
+    return gemini.generate(prompt, response_schema=list[str])
+```
+
+### フラグ更新ロジック
+
+```python
+def update_flags(course_names: list[str], academic_year: int):
+    """先行履修フラグを一括更新"""
+    # 1. 該当年度の全科目のフラグをリセット
+    db.execute("""
+        UPDATE courses
+        SET advance_enrollment = false
+        WHERE academic_year = %s
+    """, [academic_year])
+
+    # 2. 科目名で照合してフラグを設定
+    for name in course_names:
+        matched = db.find_courses_by_name(name, academic_year)
+        if matched:
+            for course in matched:
+                db.execute("""
+                    UPDATE courses
+                    SET advance_enrollment = true
+                    WHERE id = %s
+                """, [course.id])
+        else:
+            log.warning(f"先行履修科目が見つかりません: {name}")
+```
+
+> [!NOTE]
+> 科目名は PDF とデータベースで表記揺れ（全角/半角スペース等）があり得るため、正規化して照合する。
+
+## パイプライン全体フロー
 
 ```mermaid
-stateDiagram-v2
-    [*] --> detected: PDF変更検知
-    detected --> extracted: LLM抽出完了
-    extracted --> pending_review: バリデーション通過
-    pending_review --> approved: 管理者承認
-    pending_review --> rejected: 管理者却下
-    rejected --> extracted: 再抽出
-    approved --> enriched: シラバスエンリッチ完了
-    enriched --> published: API公開
+flowchart TD
+    START[GitHub Actions<br/>cron 毎日 06:00 JST] --> MON[Monitor<br/>教学課サイト監視]
+    MON --> CHK{新規/変更<br/>PDF あり?}
+    CHK -->|なし| FIN[終了]
+    CHK -->|あり| DL[PDF ダウンロード]
+    DL --> CLS[Gemini: ページ分類<br/>表ページ + ヘッダー特定]
+    CLS --> TYPE{PDF 種別?}
+    TYPE -->|時間表| EXT[Gemini: 科目抽出<br/>ヘッダー動的マッピング]
+    TYPE -->|変更一覧| CHG[Gemini: 変更解析<br/>変更エントリ抽出]
+    EXT --> VAL[バリデーション]
+    VAL --> TENT{暫定版?}
+    TENT -->|はい| SAVE1[DB保存<br/>is_tentative=true]
+    TENT -->|いいえ| DEL[暫定版データ削除] --> SAVE2[DB保存<br/>is_tentative=false]
+    SAVE1 --> ENR
+    SAVE2 --> ENR
+    CHG --> DIFF[差分適用<br/>追加/変更/休講]
+    DIFF --> ENR
+    TYPE -->|先行履修| ADV[Gemini: 科目名リスト抽出]
+    ADV --> FLAG[advance_enrollment<br/>フラグ更新]
+    FLAG --> ENR[シラバスエンリッチ<br/>分類・単位取得]
+    ENR --> FIN
 ```
 
 ### GitHub Actions ワークフロー
 
 ```yaml
-# .github/workflows/pipeline.yml
 name: Course Data Pipeline
 on:
   schedule:
     - cron: '0 21 * * *'  # 毎日 06:00 JST (UTC+9)
-  workflow_dispatch:        # 手動トリガー
+  workflow_dispatch:
 
 jobs:
   pipeline:
@@ -284,11 +598,43 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r pipeline/requirements.txt
-      - run: python -m pipeline.monitor
+      - run: python -m pipeline.main
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      - run: python -m pipeline.extractor
-      - run: python -m pipeline.enricher
+```
+
+### `pipeline/main.py` (オーケストレーター)
+
+```python
+def run_pipeline():
+    # 1. 監視
+    new_pdfs = monitor.check_for_updates()
+    if not new_pdfs:
+        log.info("変更なし、終了")
+        return
+
+    for pdf_info in new_pdfs:
+        # 2. ページ分類
+        classifications = classifier.classify_pages(pdf_info.path)
+
+        if pdf_info.type == "timetable":
+            # 3a. 時間表 → 科目抽出
+            courses = extractor.extract_courses(pdf_info.path, classifications)
+            validated = validator.validate(courses)
+            db.save_extraction(pdf_info, validated)
+
+        elif pdf_info.type == "changelog":
+            # 3b. 変更一覧 → 差分適用
+            changes = changelog.parse_changelog(pdf_info.path)
+            changelog.apply_changelog(changes, pdf_info.semester)
+
+        elif pdf_info.type == "advance_enrollment":
+            # 3c. 先行履修 → 科目名リスト抽出 → フラグ更新
+            course_names = advance.extract_course_names(pdf_info.path)
+            advance.update_flags(course_names, pdf_info.academic_year)
+
+        # 4. エンリッチ
+        enricher.enrich_new_courses()
 ```

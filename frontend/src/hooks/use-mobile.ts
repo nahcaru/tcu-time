@@ -1,25 +1,19 @@
-import { useEffect, useState } from "react"
+import * as React from "react"
 
-const MOBILE_BREAKPOINT = 1024
+const MOBILE_BREAKPOINT = 768
 
-/**
- * レスポンシブ判定 hook
- *
- * Returns true when viewport width < 1024px (mobile).
- * Used to switch between Sidebar (desktop) and BottomNav (mobile).
- */
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
 
-  useEffect(() => {
+  React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-
-    setIsMobile(mql.matches)
+    const onChange = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
     mql.addEventListener("change", onChange)
-
+    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     return () => mql.removeEventListener("change", onChange)
   }, [])
 
-  return isMobile
+  return !!isMobile
 }

@@ -24,6 +24,10 @@ erDiagram
         int year_level "1"
         text class_section ""
         int academic_year "2025"
+        text source_type "timetable or changelog"
+        boolean is_tentative "false"
+        boolean advance_enrollment "false"
+        text status "active or cancelled"
         uuid extraction_id FK
         timestamptz created_at
         timestamptz updated_at
@@ -56,7 +60,11 @@ erDiagram
         uuid id PK
         text pdf_url
         text pdf_hash
-        text status "pending/extracted/reviewed/approved"
+        text pdf_type "timetable/changelog/advance_enrollment"
+        text semester "spring or fall"
+        boolean is_tentative "false"
+        int academic_year "2025"
+        text status "pending/extracted/approved/rejected"
         jsonb raw_json
         text reviewed_by
         timestamptz created_at
@@ -91,6 +99,12 @@ CREATE TABLE courses (
   class_section TEXT DEFAULT '',
   academic_year INT NOT NULL,
   notes         TEXT DEFAULT '',
+  source_type   TEXT DEFAULT 'timetable'
+               CHECK (source_type IN ('timetable', 'changelog')),
+  advance_enrollment BOOLEAN DEFAULT false,
+  is_tentative  BOOLEAN DEFAULT false,
+  status        TEXT DEFAULT 'active'
+               CHECK (status IN ('active', 'cancelled')),
   extraction_id UUID REFERENCES extractions(id),
   created_at    TIMESTAMPTZ DEFAULT now(),
   updated_at    TIMESTAMPTZ DEFAULT now()
@@ -151,16 +165,22 @@ CREATE INDEX idx_metadata_curriculum ON course_metadata(curriculum_code);
 
 ```sql
 CREATE TABLE extractions (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pdf_url      TEXT NOT NULL,
-  pdf_hash     TEXT NOT NULL,
-  status       TEXT DEFAULT 'pending'
-               CHECK (status IN ('pending','extracted','pending_review','approved','rejected')),
-  raw_json     JSONB,
-  error_log    TEXT,
-  reviewed_by  UUID REFERENCES auth.users(id),
-  created_at   TIMESTAMPTZ DEFAULT now(),
-  updated_at   TIMESTAMPTZ DEFAULT now()
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pdf_url       TEXT NOT NULL,
+  pdf_hash      TEXT NOT NULL,
+  pdf_type      TEXT NOT NULL
+                CHECK (pdf_type IN ('timetable', 'changelog', 'advance_enrollment')),
+  semester      TEXT NOT NULL
+                CHECK (semester IN ('spring', 'fall')),
+  is_tentative  BOOLEAN DEFAULT false,
+  academic_year INT NOT NULL,
+  status        TEXT DEFAULT 'pending'
+                CHECK (status IN ('pending','extracted','pending_review','approved','rejected')),
+  raw_json      JSONB,
+  error_log     TEXT,
+  reviewed_by   UUID REFERENCES auth.users(id),
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
 );
 ```
 
