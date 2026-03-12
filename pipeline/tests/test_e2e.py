@@ -43,23 +43,31 @@ REALISTIC_HTML = """\
 <!DOCTYPE html>
 <html>
 <body>
-<div class="entry-content">
+<div id="main">
 <section>
-<h2>【大学院】 総合理工学研究科（後期情報 11/27更新）</h2>
-<details><summary>■前期■</summary>
-<p><a href="{pdf_url}">〈総合理工学研究科〉全専攻 前期 授業時間表</a>（4/1更新）</p>
-</details>
-<details open=""><summary>■後期■</summary>
-<p><a href="https://www.asc.tcu.ac.jp/wp-content/uploads/2025/09/back.pdf">\
-〈総合理工学研究科〉全専攻 後期 授業時間表</a>（9/15更新）</p>
-</details>
-<p><a href="https://www.asc.tcu.ac.jp/wp-content/uploads/2025/04/changes.pdf">\
-〈総合理工学研究科〉授業時間表変更一覧</a>（11/27更新）</p>
+<div class="header"><h3>【学部】 理工学部・建築都市デザイン学部</h3></div>
+<p><a href="https://www.asc.tcu.ac.jp/wp-content/uploads/2025/03/undergrad.pdf">\
+〈理工学部〉前期 授業時間表</a></p>
 </section>
 <section>
-<h2>【学部】 理工学部</h2>
-<a href="https://www.asc.tcu.ac.jp/wp-content/uploads/2025/03/undergrad.pdf">\
-〈理工学部〉前期 授業時間表</a>
+<div class="header"><h3>【大学院】</h3></div>
+<h4>総合理工学研究科〈全専攻〉</h4>
+<h5>■前期■</h5>
+<p>
+<a href="https://www.asc.tcu.ac.jp/wp-content/uploads/2025/04/changes.pdf">\
+【前期】授業時間表変更一覧</a><span style="color: #ff0000;">（11/27更新）</span>
+<br/>
+<a href="{pdf_url}">授業時間表</a><span style="color: #ff0000;">（4/1更新）</span>
+</p>
+<h5>■後期■</h5>
+<p>
+<a href="https://www.asc.tcu.ac.jp/wp-content/uploads/2025/09/back.pdf">\
+授業時間表</a><span style="color: #ff0000;">（9/15更新）</span>
+</p>
+<hr/>
+<h4>環境情報学研究科〈都市生活学専攻〉</h4>
+<h5>■前期■</h5>
+<p><a href="https://www.asc.tcu.ac.jp/wp-content/uploads/2025/03/env_front.pdf">授業時間表</a></p>
 </section>
 </div>
 </body>

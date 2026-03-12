@@ -16,19 +16,21 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 from dataclasses import dataclass
+from typing import Iterator
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
+from bs4.element import NavigableString
 
 from pipeline.config import Config
 from pipeline import db
 
 logger = logging.getLogger(__name__)
 
-# Filter string — only links whose text contains this are relevant.
-GRAD_FILTER = "総合理工学研究科"
+# Structural selectors for the graduate section.
+GRAD_SECTION_HEADER = "大学院"       # Text in the <h3> that marks the section
+GRAD_DEPARTMENT = "総合理工学研究科"  # Text in the <h4> for our target department
 
 
 # ---------------------------------------------------------------------------
@@ -68,42 +70,98 @@ def download_pdf(url: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def extract_pdf_links(html: str, *, filter_text: str = GRAD_FILTER) -> list[PdfLink]:
-    """Extract PDF links from the page HTML.
+def _iter_siblings_until(start: Tag, stop_tags: set[str]) -> Iterator[Tag]:
+    """Yield Tag siblings of *start* until a sibling whose tag name is in *stop_tags*."""
+    for sibling in start.next_siblings:
+        if isinstance(sibling, NavigableString):
+            continue
+        if not isinstance(sibling, Tag):
+            continue
+        if sibling.name in stop_tags:
+            return
+        yield sibling
 
-    Only links whose visible text contains *filter_text* are returned.
+
+def extract_pdf_links(
+    html: str,
+    *,
+    section_header: str = GRAD_SECTION_HEADER,
+    department: str = GRAD_DEPARTMENT,
+) -> list[PdfLink]:
+    """Extract PDF links for *department* inside the graduate *section_header*.
+
+    Parsing strategy (matches the live page at asc.tcu.ac.jp/6509/):
+      1. Find ``div#main`` (or fall back to full document).
+      2. Locate the ``<section>`` whose ``<h3>`` contains *section_header* (e.g. "大学院").
+      3. Within that section, find the ``<h4>`` containing *department*.
+      4. Walk siblings of that ``<h4>`` until the next ``<h4>`` or ``<hr>``.
+      5. Collect all ``.pdf`` ``<a>`` links in that range.
+      6. Prefix labels with the department name for downstream identification.
+
     Duplicate URLs are removed (keeps the first occurrence).
     """
     soup = BeautifulSoup(html, "html.parser")
+
+    # Step 1 — scope to main content area
+    root = soup.find("div", id="main") or soup
+
+    # Step 2 — find the graduate section
+    grad_section: Tag | None = None
+    for section in root.find_all("section"):
+        h3 = section.find("h3")
+        if h3 and section_header in h3.get_text():
+            grad_section = section
+            break
+
+    if grad_section is None:
+        logger.warning(
+            "No <section> containing <h3> with '%s' found", section_header
+        )
+        return []
+
+    # Step 3 — find the target department <h4>
+    target_h4: Tag | None = None
+    for h4 in grad_section.find_all("h4"):
+        if department in h4.get_text():
+            target_h4 = h4
+            break
+
+    if target_h4 is None:
+        logger.warning(
+            "No <h4> containing '%s' in graduate section", department
+        )
+        return []
+
+    # Step 4 — collect elements between this <h4> and the next <h4> / <hr>
     seen: set[str] = set()
     links: list[PdfLink] = []
 
-    for anchor in soup.find_all("a", href=True):
-        href = str(anchor["href"])
-        text: str = anchor.get_text(strip=True)
+    for sibling in _iter_siblings_until(target_h4, {"h4", "hr"}):
+        for anchor in sibling.find_all("a", href=True) if sibling.name != "a" else [sibling]:
+            href = str(anchor["href"])
+            text: str = anchor.get_text(strip=True)
 
-        # Must be a PDF link
-        if not href.lower().endswith(".pdf"):
-            continue
+            if not href.lower().endswith(".pdf"):
+                continue
 
-        # Must contain the filter string
-        if filter_text and filter_text not in text:
-            continue
+            # Normalise URL
+            if href.startswith("//"):
+                href = "https:" + href
+            elif href.startswith("/"):
+                href = f"https://www.asc.tcu.ac.jp{href}"
 
-        # Normalise URL (handle protocol-relative)
-        if href.startswith("//"):
-            href = "https:" + href
-        elif href.startswith("/"):
-            # Relative URL — should not happen on this site but be safe
-            href = f"https://www.asc.tcu.ac.jp{href}"
+            if href in seen:
+                continue
+            seen.add(href)
 
-        if href in seen:
-            continue
-        seen.add(href)
+            # Prefix label with department for downstream context
+            label = f"〈{department}〉{text}"
+            links.append(PdfLink(url=href, label=label))
 
-        links.append(PdfLink(url=href, label=text))
-
-    logger.info("Found %d PDF link(s) matching '%s'", len(links), filter_text)
+    logger.info(
+        "Found %d PDF link(s) for '%s' in '%s' section",
+        len(links), department, section_header,
+    )
     return links
 
 
