@@ -87,7 +87,8 @@ FAKE_SYLLABUS_HTML = """\
 @pytest.fixture
 def reference_pdf_bytes(reference_pdf_path: Path) -> bytes:
     """Read the reference PDF as bytes (uses conftest fixture)."""
-    assert reference_pdf_path.exists(), f"Reference PDF not found: {reference_pdf_path}"
+    if not reference_pdf_path.exists():
+        pytest.skip(f"Reference PDF not found: {reference_pdf_path}")
     return reference_pdf_path.read_bytes()
 
 

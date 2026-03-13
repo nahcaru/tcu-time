@@ -14,7 +14,18 @@ export interface CourseFilters {
   terms?: string[]
   search?: string
   enrolledOnly?: boolean
+  freeSlotsOnly?: boolean
+  advanceEnrollmentOnly?: boolean
   enrolledCourseIds?: Set<string>
+}
+
+// Helper to expand terms into all overlapping terms
+function getOverlappingTerms(term: string): string[] {
+  if (term === "前期") return ["前期", "前期前", "前期後"]
+  if (term === "前期前" || term === "前期後") return [term, "前期"]
+  if (term === "後期") return ["後期", "後期前", "後期後"]
+  if (term === "後期前" || term === "後期後") return [term, "後期"]
+  return [term]
 }
 
 export function useCourses(filters?: CourseFilters) {
@@ -95,6 +106,32 @@ export function useCourses(filters?: CourseFilters) {
   // Enrolled only filter
   if (filters?.enrolledOnly && filters.enrolledCourseIds) {
     courses = courses.filter((c) => filters.enrolledCourseIds!.has(c.id))
+  }
+
+  // Free slots only filter (空きコマ)
+  if (filters?.freeSlotsOnly && filters.enrolledCourseIds) {
+    const enrolledCourses = allCourses.filter(c => filters.enrolledCourseIds!.has(c.id))
+    const occupiedSlots = new Set<string>()
+    for (const ec of enrolledCourses) {
+      for (const s of ec.schedules) {
+        const overlappingTerms = getOverlappingTerms(s.term)
+        for (const t of overlappingTerms) {
+          occupiedSlots.add(`${t}-${s.day}-${s.period}`)
+        }
+      }
+    }
+    
+    courses = courses.filter((c) => {
+      // Hide already enrolled courses
+      if (filters.enrolledCourseIds!.has(c.id)) return false
+      // Keep courses that DO NOT share any slot with occupiedSlots
+      return !c.schedules.some((s) => occupiedSlots.has(`${s.term}-${s.day}-${s.period}`))
+    })
+  }
+
+  // Advance enrollment filter
+  if (filters?.advanceEnrollmentOnly) {
+    courses = courses.filter((c) => c.advance_enrollment === true)
   }
 
   return { courses, isLoading, error }

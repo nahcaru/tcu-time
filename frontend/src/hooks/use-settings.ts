@@ -10,9 +10,26 @@ import { supabase } from "@/lib/supabase"
 import type { UserSettings } from "@/lib/database.types"
 import { useAuth } from "./use-auth"
 
+const LOCAL_STORAGE_KEY = "TIME_SETTINGS"
+
 export function useSettings() {
   const { user } = useAuth()
-  const [settings, setSettings] = useState<UserSettings | null>(null)
+  
+  // Lazily initialize local storage state to avoid sync setState in useEffect
+  const [settings, setSettings] = useState<UserSettings | null>(() => {
+    if (!user) {
+      const storedSettings = localStorage.getItem(LOCAL_STORAGE_KEY)
+      if (storedSettings) {
+        try {
+          return JSON.parse(storedSettings)
+        } catch (e) {
+          console.error("Failed to parse local stored settings", e)
+        }
+      }
+    }
+    return null
+  })
+  
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
@@ -33,6 +50,8 @@ export function useSettings() {
 
       if (!error && data) {
         setSettings(data)
+      } else if (!data) {
+         setSettings(null)
       }
       setIsLoading(false)
     }
@@ -45,11 +64,24 @@ export function useSettings() {
 
   const updateSettings = useCallback(
     async (updates: Partial<Pick<UserSettings, "department" | "earned_credits" | "theme">>) => {
-      if (!user) return
+      // Create new settings to optimistic update
+      const newSettings = {
+        ...settings,
+        ...updates,
+      } as UserSettings
+      
+      setSettings(newSettings)
+      
+      if (!user) {
+        // Unauthenticated user - save to localStorage
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newSettings))
+        return
+      }
 
       const payload = {
-        user_id: user.id,
+        ...settings, // Spread the original settings to avoid overwriting unchanged fields with defaults
         ...updates,
+        user_id: user.id,
         updated_at: new Date().toISOString(),
       }
 
@@ -63,10 +95,8 @@ export function useSettings() {
         setSettings(data)
       }
     },
-    [user]
+    [user, settings]
   )
 
-  const activeSettings = user ? settings : null
-
-  return { settings: activeSettings, isLoading, updateSettings }
+  return { settings, isLoading, updateSettings }
 }

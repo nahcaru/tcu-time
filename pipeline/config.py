@@ -10,8 +10,8 @@ class Config:
     SYLLABUS_BASE_URL: str = "https://websrv.tcu.ac.jp/tcu_web_v3"
 
     SCRAPE_DELAY_SEC: float = 3.0
-    GEMINI_MODEL: str = "gemini-3.1-flash-lite"
-    GEMINI_FALLBACK_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-3.1-flash-lite-preview"
+    GEMINI_FALLBACK_MODEL: str = "gemini-3-flash-preview"
 
     @classmethod
     def validate(cls) -> None:

@@ -22,9 +22,7 @@ export function TimetablePage() {
   // Intensive courses = those with 集中 in their term
   const intensiveCourses = (terms: readonly string[]) =>
     enrolledCourses.filter((c) =>
-      c.schedules.some(
-        (s) => terms.includes(s.term) && s.term.includes("集中")
-      )
+      c.schedules.some((s) => terms.includes(s.term) && s.term.includes("集中"))
     )
 
   // Regular (non-intensive) enrolled courses for grid display
@@ -36,7 +34,7 @@ export function TimetablePage() {
     )
 
   return (
-    <div className="flex flex-col h-full bg-background md:-mx-6 md:-mt-6 md:p-6 lg:p-0">
+    <div className="flex h-full flex-col md:-mx-6 md:-mt-6 md:p-6 lg:p-0">
       <div className="flex flex-col gap-6 lg:p-6 lg:pl-8">
         <Tabs defaultValue="spring" className="w-full">
           <div className="mb-4 flex items-center justify-between">
@@ -49,8 +47,12 @@ export function TimetablePage() {
 
           <TabsContent value="spring" className="mt-0">
             <SemesterContent
-              regularCourses={regularCourses(SPRING_TERMS) as CourseWithRelations[]}
-              intensiveCourses={intensiveCourses(SPRING_TERMS) as CourseWithRelations[]}
+              regularCourses={
+                regularCourses(SPRING_TERMS) as CourseWithRelations[]
+              }
+              intensiveCourses={
+                intensiveCourses(SPRING_TERMS) as CourseWithRelations[]
+              }
               enrolledCourses={enrolledCourses}
               firstHalfTerms={["前期前", "前期"]}
               secondHalfTerms={["前期後", "前期"]}
@@ -60,8 +62,12 @@ export function TimetablePage() {
 
           <TabsContent value="fall" className="mt-0">
             <SemesterContent
-              regularCourses={regularCourses(FALL_TERMS) as CourseWithRelations[]}
-              intensiveCourses={intensiveCourses(FALL_TERMS) as CourseWithRelations[]}
+              regularCourses={
+                regularCourses(FALL_TERMS) as CourseWithRelations[]
+              }
+              intensiveCourses={
+                intensiveCourses(FALL_TERMS) as CourseWithRelations[]
+              }
               enrolledCourses={enrolledCourses}
               firstHalfTerms={["後期前", "後期"]}
               secondHalfTerms={["後期後", "後期"]}
@@ -111,10 +117,7 @@ function SemesterContent({
           <IntensiveCourses courses={intensiveCourses} />
         </div>
         <div className="lg:col-span-2">
-          <CreditsTable
-            termType={termType}
-            enrolledCourses={enrolledCourses}
-          />
+          <CreditsTable termType={termType} enrolledCourses={enrolledCourses} />
         </div>
       </div>
     </div>

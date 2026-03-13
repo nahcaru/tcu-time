@@ -10,14 +10,18 @@ from ..monitor import (
     fetch_page,
     download_pdf,
     extract_pdf_links,
+    extract_advance_pdf_links,
     compute_hash,
     check_for_updates,
+    classify_pdf_link,
     main,
     PdfLink,
     _iter_siblings_until,
     GRAD_SECTION_HEADER,
     GRAD_DEPARTMENT,
+    ADVANCE_SECTION_HEADER,
 )
+from ..models import PDFType, Semester
 
 
 # =============================================================================
@@ -423,6 +427,121 @@ class TestExtractPdfLinks:
 
 
 # =============================================================================
+# Test extract_advance_pdf_links() — 先行履修 section
+# =============================================================================
+
+
+class TestExtractAdvancePdfLinks:
+    """Test extract_advance_pdf_links() for the 先行履修 section."""
+
+    def test_extracts_advance_link_from_realistic_html(self) -> None:
+        """Should extract advance enrollment PDF from 先行履修 section."""
+        links = extract_advance_pdf_links(REALISTIC_HTML)
+
+        assert len(links) == 1
+        assert links[0].url == "https://example.com/advance.pdf"
+        assert "先行履修" in links[0].label
+
+    def test_label_preserves_original_text(self) -> None:
+        """Should use original link text as label (no department prefix)."""
+        links = extract_advance_pdf_links(REALISTIC_HTML)
+
+        assert links[0].label == "先行履修についての案内"
+
+    def test_no_advance_section(self) -> None:
+        """Should return empty list when no 先行履修 section exists."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【大学院】</h3></div>
+          <h4>総合理工学研究科〈全専攻〉</h4>
+          <p><a href="https://example.com/grad.pdf">授業時間表</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html)
+        assert links == []
+
+    def test_multiple_advance_links(self) -> None:
+        """Should collect multiple PDF links in the advance section."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【先行履修】</h3></div>
+          <p><a href="https://example.com/advance1.pdf">世田谷キャンパス案内</a></p>
+          <p><a href="https://example.com/advance2.pdf">横浜キャンパス案内</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html)
+        assert len(links) == 2
+
+    def test_ignores_non_pdf_links(self) -> None:
+        """Should ignore non-PDF links in the advance section."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【先行履修】</h3></div>
+          <p><a href="https://example.com/page.html">Not a PDF</a></p>
+          <p><a href="https://example.com/advance.pdf">A PDF</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html)
+        assert len(links) == 1
+        assert links[0].url == "https://example.com/advance.pdf"
+
+    def test_deduplicates_urls(self) -> None:
+        """Should remove duplicate URLs."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【先行履修】</h3></div>
+          <p><a href="https://example.com/advance.pdf">First</a></p>
+          <p><a href="https://example.com/advance.pdf">Second</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html)
+        assert len(links) == 1
+        assert links[0].label == "First"
+
+    def test_normalises_relative_url(self) -> None:
+        """Should normalise relative URLs to absolute."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【先行履修】</h3></div>
+          <p><a href="/wp-content/uploads/advance.pdf">案内</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html)
+        assert links[0].url == "https://www.asc.tcu.ac.jp/wp-content/uploads/advance.pdf"
+
+    def test_does_not_include_grad_links(self) -> None:
+        """Should NOT include links from the graduate section."""
+        links = extract_advance_pdf_links(REALISTIC_HTML)
+        urls = [link.url for link in links]
+
+        assert "https://example.com/grad_front.pdf" not in urls
+        assert "https://example.com/grad_changes.pdf" not in urls
+
+    def test_custom_section_header(self) -> None:
+        """Should support custom section header."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【特別履修】</h3></div>
+          <p><a href="https://example.com/special.pdf">特別案内</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html, section_header="特別履修")
+        assert len(links) == 1
+
+
+# =============================================================================
 # Test _iter_siblings_until()
 # =============================================================================
 
@@ -535,15 +654,15 @@ class TestCheckForUpdates:
     ) -> None:
         """Should detect new PDF and queue for extraction."""
         mock_fetch.return_value = self.CHECK_FOR_UPDATES_HTML
-        mock_download.side_effect = [b"content1", b"content2", b"content3"]
+        mock_download.side_effect = [b"content1", b"content2", b"content3", b"content4"]
         mock_get_stored.return_value = {}  # No stored links
 
         result = check_for_updates()
 
-        assert len(result) == 3
+        assert len(result) == 4  # 3 grad + 1 advance enrollment
         assert all(r["action"] == "new" for r in result)
-        assert mock_create_extraction.call_count == 3
-        assert mock_upsert_pdf_link.call_count == 3
+        assert mock_create_extraction.call_count == 4
+        assert mock_upsert_pdf_link.call_count == 4
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
@@ -566,13 +685,14 @@ class TestCheckForUpdates:
             "https://example.com/grad_changes.pdf": {"hash": old_hash},
             "https://example.com/grad_front.pdf": {"hash": old_hash},
             "https://example.com/grad_back.pdf": {"hash": old_hash},
+            "https://example.com/advance.pdf": {"hash": old_hash},
         }
 
         result = check_for_updates()
 
-        assert len(result) == 3
+        assert len(result) == 4
         assert all(r["action"] == "changed" for r in result)
-        assert mock_create_extraction.call_count == 3
+        assert mock_create_extraction.call_count == 4
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
@@ -596,6 +716,7 @@ class TestCheckForUpdates:
             "https://example.com/grad_changes.pdf": {"hash": pdf_hash},
             "https://example.com/grad_front.pdf": {"hash": pdf_hash},
             "https://example.com/grad_back.pdf": {"hash": pdf_hash},
+            "https://example.com/advance.pdf": {"hash": pdf_hash},
         }
 
         result = check_for_updates()
@@ -618,7 +739,7 @@ class TestCheckForUpdates:
         mock_fetch,
     ) -> None:
         """Should handle mixed scenario: new + unchanged."""
-        # Use HTML with 3 links — 2 are stored/unchanged, 1 is new
+        # Use HTML with 4 links — 3 are stored/unchanged, 1 is new
         mock_fetch.return_value = self.CHECK_FOR_UPDATES_HTML
         unchanged_content = b"unchanged"
         unchanged_hash = compute_hash(unchanged_content)
@@ -626,10 +747,12 @@ class TestCheckForUpdates:
             b"new content",       # grad_changes — not in stored
             unchanged_content,    # grad_front — unchanged
             unchanged_content,    # grad_back — unchanged
+            unchanged_content,    # advance — unchanged
         ]
         mock_get_stored.return_value = {
             "https://example.com/grad_front.pdf": {"hash": unchanged_hash},
             "https://example.com/grad_back.pdf": {"hash": unchanged_hash},
+            "https://example.com/advance.pdf": {"hash": unchanged_hash},
         }
 
         result = check_for_updates()
@@ -678,9 +801,13 @@ class TestCheckForUpdates:
             assert "url" in item
             assert "label" in item
             assert "action" in item
+            assert "pdf_type" in item
+            assert "semester" in item
             assert item["action"] in ["new", "changed"]
             assert isinstance(item["url"], str)
             assert isinstance(item["label"], str)
+            assert item["pdf_type"] in ["timetable", "changelog", "advance_enrollment"]
+            assert item["semester"] in ["spring", "fall", "both"]
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.config.Config.validate")
@@ -809,3 +936,70 @@ class TestIntegration:
 
         assert hash1 == hash2
         assert hash1 != hash3
+
+
+# =============================================================================
+# Test classify_pdf_link()
+# =============================================================================
+
+
+class TestClassifyPdfLink:
+    """Test classify_pdf_link() function."""
+
+    def test_timetable_spring(self) -> None:
+        """Should classify spring timetable link."""
+        result = classify_pdf_link("〈総合理工学研究科〉前期 授業時間表")
+        assert result.pdf_type == PDFType.TIMETABLE
+        assert result.semester == Semester.SPRING
+
+    def test_timetable_fall(self) -> None:
+        """Should classify fall timetable link."""
+        result = classify_pdf_link("〈総合理工学研究科〉後期 授業時間表")
+        assert result.pdf_type == PDFType.TIMETABLE
+        assert result.semester == Semester.FALL
+
+    def test_timetable_both_semesters(self) -> None:
+        """Should return None semester when both semesters present."""
+        result = classify_pdf_link("〈総合理工学研究科〉授業時間表")
+        assert result.pdf_type == PDFType.TIMETABLE
+        assert result.semester is None
+
+    def test_timetable_both_semesters_explicit(self) -> None:
+        """Should return None semester when both 前期 and 後期 in text."""
+        result = classify_pdf_link("前期・後期 授業時間表")
+        assert result.pdf_type == PDFType.TIMETABLE
+        assert result.semester is None
+
+    def test_changelog(self) -> None:
+        """Should classify changelog link."""
+        result = classify_pdf_link("【前期】授業時間表変更一覧")
+        assert result.pdf_type == PDFType.CHANGELOG
+        assert result.semester == Semester.SPRING
+
+    def test_changelog_fall(self) -> None:
+        """Should classify fall changelog link."""
+        result = classify_pdf_link("【後期】授業時間表変更一覧")
+        assert result.pdf_type == PDFType.CHANGELOG
+        assert result.semester == Semester.FALL
+
+    def test_changelog_keyword_henkou(self) -> None:
+        """Should classify 変更 (without 一覧) as changelog."""
+        result = classify_pdf_link("授業時間表変更")
+        assert result.pdf_type == PDFType.CHANGELOG
+
+    def test_advance_enrollment(self) -> None:
+        """Should classify advance enrollment link."""
+        result = classify_pdf_link("先行履修についての案内")
+        assert result.pdf_type == PDFType.ADVANCE_ENROLLMENT
+        assert result.semester is None
+
+    def test_is_tentative_default_false(self) -> None:
+        """is_tentative should default to False."""
+        result = classify_pdf_link("授業時間表")
+        assert result.is_tentative is False
+
+    def test_plain_timetable_no_semester_keyword(self) -> None:
+        """A plain 授業時間表 without semester keywords → timetable, None semester."""
+        result = classify_pdf_link("授業時間表")
+        assert result.pdf_type == PDFType.TIMETABLE
+        assert result.semester is None

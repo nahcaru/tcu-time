@@ -73,40 +73,52 @@ export type Database = {
       courses: {
         Row: {
           academic_year: number
+          advance_enrollment: boolean | null
           class_section: string | null
           code: string
           created_at: string | null
           extraction_id: string | null
           id: string
           instructors: string[]
+          is_tentative: boolean | null
           name: string
           notes: string | null
+          source_type: string | null
+          status: string | null
           updated_at: string | null
           year_level: number | null
         }
         Insert: {
           academic_year: number
+          advance_enrollment?: boolean | null
           class_section?: string | null
           code: string
           created_at?: string | null
           extraction_id?: string | null
           id?: string
           instructors: string[]
+          is_tentative?: boolean | null
           name: string
           notes?: string | null
+          source_type?: string | null
+          status?: string | null
           updated_at?: string | null
           year_level?: number | null
         }
         Update: {
           academic_year?: number
+          advance_enrollment?: boolean | null
           class_section?: string | null
           code?: string
           created_at?: string | null
           extraction_id?: string | null
           id?: string
           instructors?: string[]
+          is_tentative?: boolean | null
           name?: string
           notes?: string | null
+          source_type?: string | null
+          status?: string | null
           updated_at?: string | null
           year_level?: number | null
         }

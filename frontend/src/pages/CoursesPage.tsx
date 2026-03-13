@@ -17,6 +17,8 @@ export function CoursesPage() {
   const [selectedTerms, setSelectedTerms] = useState<string[]>([])
   const [search, setSearch] = useState("")
   const [enrolledOnly, setEnrolledOnly] = useState(false)
+  const [freeSlotsOnly, setFreeSlotsOnly] = useState(false)
+  const [advanceEnrollmentOnly, setAdvanceEnrollmentOnly] = useState(false)
 
   // Enrollments
   const { enrolledCourseIds, addEnrollment, removeEnrollment } =
@@ -28,6 +30,8 @@ export function CoursesPage() {
     terms: selectedTerms,
     search,
     enrolledOnly,
+    freeSlotsOnly,
+    advanceEnrollmentOnly,
     enrolledCourseIds,
   })
 
@@ -51,17 +55,21 @@ export function CoursesPage() {
     selectedTargets,
     selectedTerms,
     enrolledOnly,
+    freeSlotsOnly,
+    advanceEnrollmentOnly,
     onTargetsChange: setSelectedTargets,
     onTermsChange: setSelectedTerms,
     onEnrolledOnlyChange: setEnrolledOnly,
+    onFreeSlotsOnlyChange: setFreeSlotsOnly,
+    onAdvanceEnrollmentOnlyChange: setAdvanceEnrollmentOnly,
   }
 
   return (
-    <div className="flex h-full bg-background md:-mt-6 md:-mx-6 md:p-6 lg:p-0">
+    <div className="flex h-full md:-mx-6 md:-mt-6 md:p-6 lg:p-0">
       {!isMobile && <FilterPanel {...filterProps} />}
 
-      <div className="flex-1 flex flex-col min-w-0 lg:p-6 lg:pl-8">
-        <div className="flex flex-col gap-4 mb-6">
+      <div className="flex min-w-0 flex-1 flex-col lg:p-6 lg:pl-8">
+        <div className="mb-6 flex flex-col gap-4">
           <div className="flex items-center gap-3">
             {isMobile && <FilterPanel {...filterProps} />}
             <SearchBar value={search} onChange={setSearch} />
@@ -73,16 +81,16 @@ export function CoursesPage() {
             <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <div className="text-center py-12 text-destructive">
+          <div className="py-12 text-center text-destructive">
             データの取得に失敗しました: {error.message}
           </div>
         ) : courses.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="py-12 text-center text-muted-foreground">
             該当する科目が見つかりません
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <div className="text-sm text-muted-foreground mb-1">
+            <div className="mb-1 text-sm text-muted-foreground">
               {courses.length}件の科目
             </div>
             {courses.map((course) => (
@@ -108,11 +116,11 @@ export function CoursesPage() {
           if (!open) setDialogCourse(null)
         }}
         course={dialogCourse}
-        isEnrolled={dialogCourse ? enrolledCourseIds.has(dialogCourse.id) : false}
+        isEnrolled={
+          dialogCourse ? enrolledCourseIds.has(dialogCourse.id) : false
+        }
         onToggleEnroll={
-          dialogCourse
-            ? () => handleToggleEnroll(dialogCourse.id)
-            : undefined
+          dialogCourse ? () => handleToggleEnroll(dialogCourse.id) : undefined
         }
       />
     </div>

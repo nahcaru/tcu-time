@@ -2,8 +2,6 @@ import { BrowserRouter, Routes, Route } from "react-router"
 import { Layout } from "@/components/layout/Layout"
 import { CoursesPage } from "@/pages/CoursesPage"
 import { TimetablePage } from "@/pages/TimetablePage"
-import { LoginPage } from "@/pages/LoginPage"
-import { ProfilePage } from "@/pages/ProfilePage"
 import { AdminPage } from "@/pages/AdminPage"
 
 export function App() {
@@ -13,8 +11,6 @@ export function App() {
         <Route element={<Layout />}>
           <Route index element={<CoursesPage />} />
           <Route path="timetable" element={<TimetablePage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="profile" element={<ProfilePage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>

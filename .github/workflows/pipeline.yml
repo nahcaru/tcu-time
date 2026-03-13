@@ -31,11 +31,5 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Check for PDF updates
-        run: uv run python -m pipeline.monitor
-
-      - name: Extract courses from PDF
-        run: uv run python -m pipeline.extractor
-
-      - name: Enrich courses from syllabus
-        run: uv run python -m pipeline.enricher
+      - name: Run pipeline
+        run: uv run python -m pipeline.main

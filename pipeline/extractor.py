@@ -28,7 +28,9 @@ from pipeline.models import (
     CourseTarget,
     ExtractedCourse,
     ExtractionResult,
+    PageClassification,
     Schedule,
+    Semester,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,11 +56,9 @@ _I_CODE = 4
 _I_ROOM = 5
 _I_TARGET = 6
 
-# Page ranges (0-indexed)
-FRONT_REGULAR_PAGES = [6, 7]   # Pages 7-8: regular front-semester courses
-FRONT_INTENSIVE_PAGES = [8]    # Page 9: intensive front-semester courses
-BACK_REGULAR_PAGES = [9, 10]   # Pages 10-11: regular back-semester courses
-BACK_INTENSIVE_PAGES = [11]    # Page 12: intensive back-semester courses
+# Column count thresholds for auto-detecting table type
+_REGULAR_COL_COUNT = 10   # Regular tables have 10 columns
+_INTENSIVE_COL_COUNT = 7  # Intensive tables have 7 columns
 
 
 # ---------------------------------------------------------------------------
@@ -83,28 +83,66 @@ def _fullwidth_to_half(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+class _TablePage:
+    """Internal container for a single page's extracted table data."""
+
+    __slots__ = ("rows", "is_intensive", "semester")
+
+    def __init__(
+        self,
+        rows: list[list[str]],
+        is_intensive: bool,
+        semester: Semester | None,
+    ) -> None:
+        self.rows = rows
+        self.is_intensive = is_intensive
+        self.semester = semester
+
+
 def extract_tables_from_pdf(
     pdf_bytes: bytes,
-) -> tuple[list[list[list[str]]], list[list[list[str]]]]:
-    """Extract tables from the PDF.
+    classifications: list[PageClassification] | None = None,
+) -> tuple[list[_TablePage], list[_TablePage]]:
+    """Extract tables from the PDF using page classifications.
 
-    Returns (regular_tables, intensive_tables) where each is a list of
-    raw table data (list of rows, each row a list of cell strings).
+    *classifications* is the output of ``classifier.classify_pages()``.
+    Only pages classified as ``course_table_spring`` or
+    ``course_table_fall`` are processed.
+
+    If *classifications* is ``None`` the function falls back to the
+    legacy behaviour of processing **all** pages that contain a table,
+    auto-detecting regular vs intensive from column count.
+
+    Returns ``(regular_pages, intensive_pages)`` where each element is a
+    :class:`_TablePage` carrying the normalised rows, the detected table
+    type and the semester hint.
     """
-    regular_tables: list[list[list[str]]] = []
-    intensive_tables: list[list[list[str]]] = []
+    regular_pages: list[_TablePage] = []
+    intensive_pages: list[_TablePage] = []
 
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-        all_page_indices = (
-            FRONT_REGULAR_PAGES
-            + FRONT_INTENSIVE_PAGES
-            + BACK_REGULAR_PAGES
-            + BACK_INTENSIVE_PAGES
-        )
+        # Determine which pages to process
+        if classifications is not None:
+            page_specs: list[tuple[int, Semester | None]] = []
+            for pc in classifications:
+                if pc.type in ("course_table_spring", "course_table_fall"):
+                    sem = (
+                        Semester.SPRING
+                        if pc.type == "course_table_spring"
+                        else Semester.FALL
+                    )
+                    page_specs.append((pc.page - 1, sem))  # 1-indexed → 0-indexed
+        else:
+            # Legacy fallback: all pages
+            page_specs = [(i, None) for i in range(len(pdf.pages))]
 
-        for page_idx in all_page_indices:
+        for page_idx, semester in page_specs:
             if page_idx >= len(pdf.pages):
-                logger.warning("Page %d not found in PDF (total: %d)", page_idx + 1, len(pdf.pages))
+                logger.warning(
+                    "Page %d not found in PDF (total: %d)",
+                    page_idx + 1,
+                    len(pdf.pages),
+                )
                 continue
 
             page = pdf.pages[page_idx]
@@ -127,13 +165,20 @@ def extract_tables_from_pdf(
             ):
                 raw = raw[1:]
 
-            is_intensive = page_idx in FRONT_INTENSIVE_PAGES + BACK_INTENSIVE_PAGES
-            if is_intensive:
-                intensive_tables.append(raw)
-            else:
-                regular_tables.append(raw)
+            if not raw:
+                continue
 
-    return regular_tables, intensive_tables
+            # Detect regular vs intensive from column count
+            col_count = max(len(row) for row in raw) if raw else 0
+            is_intensive = col_count <= _INTENSIVE_COL_COUNT
+
+            tp = _TablePage(rows=raw, is_intensive=is_intensive, semester=semester)
+            if is_intensive:
+                intensive_pages.append(tp)
+            else:
+                regular_pages.append(tp)
+
+    return regular_pages, intensive_pages
 
 
 # ---------------------------------------------------------------------------
@@ -609,37 +654,49 @@ def deduplicate_courses(
 
 def extract_courses_from_pdf(
     pdf_bytes: bytes,
+    classifications: list[PageClassification] | None = None,
 ) -> list[ExtractedCourse]:
     """Extract all courses from a PDF timetable.
 
     This is the main entry point for the extraction logic.
+
+    *classifications* comes from ``classifier.classify_pages()``.  When
+    provided, only classified course-table pages are processed and each
+    extracted course receives the appropriate ``semester`` value.
+
+    When *classifications* is ``None`` the legacy behaviour is used
+    (all pages, no semester tagging).
     """
-    regular_tables, intensive_tables = extract_tables_from_pdf(pdf_bytes)
+    regular_pages, intensive_pages = extract_tables_from_pdf(
+        pdf_bytes, classifications
+    )
 
     all_courses: list[ExtractedCourse] = []
     errors: list[str] = []
 
     # Process regular tables
-    for table in regular_tables:
-        merged = merge_multiline_rows(table, is_intensive=False)
+    for tp in regular_pages:
+        merged = merge_multiline_rows(tp.rows, is_intensive=False)
         filled = carry_forward(merged, is_intensive=False)
         for row in filled:
             try:
                 course = parse_regular_row(row)
                 if course:
+                    course.semester = tp.semester
                     all_courses.append(course)
             except Exception as e:
                 errors.append(f"Regular row parse error: {e} — row={row}")
                 logger.warning("Failed to parse regular row: %s", e)
 
     # Process intensive tables
-    for table in intensive_tables:
-        merged = merge_multiline_rows(table, is_intensive=True)
+    for tp in intensive_pages:
+        merged = merge_multiline_rows(tp.rows, is_intensive=True)
         filled = carry_forward(merged, is_intensive=True)
         for row in filled:
             try:
                 course = parse_intensive_row(row)
                 if course:
+                    course.semester = tp.semester
                     all_courses.append(course)
             except Exception as e:
                 errors.append(f"Intensive row parse error: {e} — row={row}")
@@ -683,6 +740,7 @@ def compute_hash(data: bytes) -> str:
 def main() -> None:
     """Run extraction for all pending extractions in the database."""
     from pipeline import db
+    from pipeline.classifier import classify_pages
 
     Config.validate()
 
@@ -698,7 +756,10 @@ def main() -> None:
 
         try:
             pdf_bytes = download_pdf(pdf_url)
-            courses = extract_courses_from_pdf(pdf_bytes)
+
+            # Classify pages with Gemini
+            classifications = classify_pages(pdf_bytes)
+            courses = extract_courses_from_pdf(pdf_bytes, classifications)
 
             # Determine academic year from URL or default to current year
             academic_year = _detect_academic_year(pdf_url)

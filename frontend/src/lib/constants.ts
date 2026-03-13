@@ -1,16 +1,17 @@
 /** Target department codes from course_targets table */
 export const TARGETS = [
   { code: "00", label: "共通" },
-  { code: "01", label: "機械(1)" },
-  { code: "02", label: "機械(2)" },
-  { code: "03", label: "エネルギー化学" },
-  { code: "04", label: "電気・化学(1)" },
-  { code: "05", label: "電気・化学(2)" },
-  { code: "06", label: "共同原子力" },
-  { code: "08", label: "建築都市デザイン" },
-  { code: "09", label: "情報(1)" },
-  { code: "10", label: "情報(2)" },
-  { code: "11", label: "自然" },
+  { code: "01", label: "機械専攻(機械工学)" },
+  { code: "02", label: "機械専攻(機械システム工学)" },
+  { code: "03", label: "電気・化学専攻(電気電子工学)" },
+  { code: "04", label: "電気・化学専攻(医用工学)" },
+  { code: "05", label: "電気・化学専攻(応用化学)" },
+  { code: "06", label: "共同原子力専攻(共同原子力)" },
+  { code: "7", label: "建築都市デザイン専攻(建築学)" },
+  { code: "08", label: "建築都市デザイン専攻(都市工学)" },
+  { code: "09", label: "情報専攻(情報工学)" },
+  { code: "10", label: "情報専攻(システム情報工学)" },
+  { code: "11", label: "自然科学専攻(自然科学)" },
 ] as const
 
 export type TargetCode = (typeof TARGETS)[number]["code"]
