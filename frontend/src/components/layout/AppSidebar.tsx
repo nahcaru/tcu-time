@@ -58,8 +58,8 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="offcanvas" variant="inset" className="dark">
-        <SidebarHeader className="flex h-14 items-center justify-center border-b text-xl font-bold">
+      <Sidebar collapsible="icon" variant="inset" className="dark">
+        <SidebarHeader className="flex h-14 items-center justify-center border-b text-xl font-bold text-sidebar-primary">
           {state === "collapsed" ? "TIME" : "TCU-TIME"}
         </SidebarHeader>
         <SidebarContent>

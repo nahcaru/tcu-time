@@ -33,17 +33,17 @@ export function CourseGrid({ title, terms, enrolledCourses }: CourseGridProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="font-semibold text-sm text-muted-foreground px-1">
+      <h3 className="px-1 text-sm font-semibold text-muted-foreground">
         {title}
       </h3>
-      <div className="rounded-md border overflow-x-auto bg-card">
-        <div className="min-w-[500px] grid grid-cols-[3rem_repeat(6,1fr)]">
+      <div className="overflow-x-auto rounded-md border bg-card">
+        <div className="grid min-w-[500px] grid-cols-[3rem_repeat(5,1fr)]">
           {/* Header Row */}
-          <div className="border-b border-r bg-muted/30 p-2"></div>
+          <div className="border-r border-b bg-muted/30 p-2"></div>
           {DAYS.map((day) => (
             <div
               key={day}
-              className="border-b border-r last:border-r-0 bg-muted/30 p-2 text-center text-sm font-medium"
+              className="border-r border-b bg-muted/30 p-2 text-center text-sm font-medium last:border-r-0"
             >
               {day}
             </div>
@@ -52,7 +52,7 @@ export function CourseGrid({ title, terms, enrolledCourses }: CourseGridProps) {
           {/* Grid Rows */}
           {PERIODS.map((period) => (
             <div key={period} className="contents">
-              <div className="border-b last:border-b-0 border-r bg-muted/30 p-2 flex items-center justify-center text-sm font-medium">
+              <div className="flex items-center justify-center border-r border-b bg-muted/30 p-2 text-sm font-medium last:border-b-0">
                 {period}
               </div>
               {DAYS.map((day) => {
@@ -70,7 +70,7 @@ export function CourseGrid({ title, terms, enrolledCourses }: CourseGridProps) {
                 return (
                   <div
                     key={`${day}-${period}`}
-                    className="border-b last:border-b-0 border-r last:border-r-0 p-1 bg-background"
+                    className="border-r border-b bg-background p-1 last:border-r-0 last:border-b-0"
                   >
                     <GridCell state={state} courseName={name} />
                   </div>

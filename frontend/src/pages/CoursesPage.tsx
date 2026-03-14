@@ -8,6 +8,7 @@ import { useEnrollments } from "@/hooks/use-enrollments"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { IconLoader2 } from "@tabler/icons-react"
 import type { CourseWithRelations } from "@/lib/database.types"
+import { PageHeader } from "@/components/layout/PageHeader"
 
 export function CoursesPage() {
   const isMobile = useIsMobile()
@@ -65,49 +66,60 @@ export function CoursesPage() {
   }
 
   return (
-    <div className="flex h-full md:-mx-6 md:-mt-6 md:p-6 lg:p-0">
-      {!isMobile && <FilterPanel {...filterProps} />}
-
-      <div className="flex min-w-0 flex-1 flex-col lg:p-6 lg:pl-8">
-        <div className="mb-6 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            {isMobile && <FilterPanel {...filterProps} />}
+    <div className="relative flex min-h-full flex-col pb-6">
+      <PageHeader title="科目一覧">
+        <div className="flex w-full items-center gap-4 md:max-w-2xl">
+          <div className="flex-1">
             <SearchBar value={search} onChange={setSearch} />
           </div>
+          {isMobile && <FilterPanel {...filterProps} />}
         </div>
+      </PageHeader>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : error ? (
-          <div className="py-12 text-center text-destructive">
-            データの取得に失敗しました: {error.message}
-          </div>
-        ) : courses.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
-            該当する科目が見つかりません
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div className="mb-1 text-sm text-muted-foreground">
-              {courses.length}件の科目
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        {!isMobile && (
+          <div className="hidden w-64 shrink-0 border-r p-4 md:block">
+            <div className="sticky top-16">
+              <FilterPanel {...filterProps} />
             </div>
-            {courses.map((course) => (
-              <div
-                key={course.id}
-                onClick={() => setDialogCourse(course)}
-                className="cursor-pointer"
-              >
-                <CourseCard
-                  course={course}
-                  isEnrolled={enrolledCourseIds.has(course.id)}
-                  onToggleEnroll={() => handleToggleEnroll(course.id)}
-                />
-              </div>
-            ))}
           </div>
         )}
+
+        {/* Main Content Area */}
+        <div className="min-w-0 flex-1 px-4 py-4 md:px-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="py-12 text-center text-destructive">
+              データの取得に失敗しました: {error.message}
+            </div>
+          ) : courses.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              該当する科目が見つかりません
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="mb-1 text-sm text-muted-foreground">
+                {courses.length}件の科目
+              </div>
+              {courses.map((course) => (
+                <div
+                  key={course.id}
+                  onClick={() => setDialogCourse(course)}
+                  className="cursor-pointer"
+                >
+                  <CourseCard
+                    course={course}
+                    isEnrolled={enrolledCourseIds.has(course.id)}
+                    onToggleEnroll={() => handleToggleEnroll(course.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <CourseDialog

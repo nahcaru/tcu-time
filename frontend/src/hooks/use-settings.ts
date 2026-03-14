@@ -10,6 +10,12 @@ import { supabase } from "@/lib/supabase"
 import type { UserSettings } from "@/lib/database.types"
 import { useAuth } from "./use-auth"
 
+export interface EarnedCredits {
+  practical: number
+  research: number
+  lectures: number
+}
+
 const LOCAL_STORAGE_KEY = "TIME_SETTINGS"
 
 export function useSettings() {

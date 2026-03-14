@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { CourseWithRelations } from "@/lib/database.types"
 
 interface IntensiveCoursesProps {
@@ -8,36 +7,32 @@ interface IntensiveCoursesProps {
 
 export function IntensiveCourses({ courses }: IntensiveCoursesProps) {
   return (
-    <Card className="min-h-[248px] flex flex-col h-full">
-      <CardHeader className="py-4">
-        <CardTitle className="text-base font-semibold">
-          集中科目
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col gap-2">
+    <div className="flex h-full flex-col gap-2">
+      <h3 className="px-1 text-sm font-semibold text-muted-foreground">
+        集中科目
+      </h3>
+      <div className="flex flex-1 flex-col rounded-md border bg-card p-2">
         {courses.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
+          <div className="flex h-10 flex-1 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-transparent text-center text-xs text-muted-foreground sm:h-12 sm:text-sm">
             登録された集中科目はありません
           </div>
         ) : (
-          courses.map((course) => {
-            const terms = [
-              ...new Set(course.schedules.map((s) => s.term)),
-            ].join("・")
-            return (
-              <div
-                key={course.id}
-                className="rounded-md border p-3 text-sm bg-muted/40 fade-in zoom-in-95 animate-in"
-              >
-                <div className="font-semibold text-primary">{course.name}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {terms}
+          <div className="flex flex-col gap-2">
+            {courses.map((course) => {
+              return (
+                <div
+                  key={course.id}
+                  className="flex min-h-10 animate-in flex-col items-center justify-center rounded-md border border-transparent bg-secondary p-1 text-center text-xs text-secondary-foreground shadow-sm transition-colors zoom-in-95 fade-in hover:bg-secondary/80 sm:min-h-12 sm:p-2 sm:text-sm"
+                >
+                  <span className="line-clamp-2 md:line-clamp-3">
+                    {course.name}
+                  </span>
                 </div>
-              </div>
-            )
-          })
+              )
+            })}
+          </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

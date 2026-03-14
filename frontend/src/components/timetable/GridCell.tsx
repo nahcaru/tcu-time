@@ -13,10 +13,13 @@ export function GridCell({ state, courseName, onClick }: GridCellProps) {
     <div
       onClick={onClick}
       className={cn(
-        "h-20 sm:h-24 p-1 sm:p-2 border rounded-md flex items-center justify-center text-center text-xs sm:text-sm transition-colors cursor-pointer",
-        state === "empty" && "bg-transparent hover:bg-muted/50 border-dashed border-muted-foreground/30",
-        state === "single" && "bg-secondary text-secondary-foreground hover:bg-secondary/80 border-transparent shadow-sm",
-        state === "conflict" && "bg-destructive text-destructive-foreground hover:bg-destructive/90 border-transparent font-medium shadow-sm"
+        "flex h-10 cursor-pointer items-center justify-center rounded-md border p-1 text-center text-xs transition-colors sm:h-12 sm:p-2 sm:text-sm",
+        state === "empty" &&
+          "border-dashed border-muted-foreground/30 bg-transparent hover:bg-muted/50",
+        state === "single" &&
+          "border-transparent bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        state === "conflict" &&
+          "text-destructive-foreground border-transparent bg-destructive font-medium shadow-sm hover:bg-destructive/90"
       )}
     >
       {state === "single" && (

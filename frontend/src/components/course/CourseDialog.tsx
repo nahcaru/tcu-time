@@ -3,7 +3,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -32,10 +31,14 @@ export function CourseDialog({
     .map((s) => `${s.term} ${s.day}${s.period}`)
     .join(", ")
 
-  const rooms = [...new Set(course.schedules.map((s) => s.room).filter(Boolean))]
+  const rooms = [
+    ...new Set(course.schedules.map((s) => s.room).filter(Boolean)),
+  ]
 
   const targetText = course.course_targets
-    .map((t) => `${t.target_code}${t.target_name}${t.note ? `(${t.note})` : ""}`)
+    .map(
+      (t) => `${t.target_code}${t.target_name}${t.note ? `(${t.note})` : ""}`
+    )
     .join(", ")
 
   const credits = course.course_metadata[0]?.credits
@@ -45,9 +48,6 @@ export function CourseDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="text-xl">{course.name}</DialogTitle>
-          <DialogDescription>
-            シラバスの関連情報と登録状況を確認します。
-          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 py-4 text-sm">
           <Row label="学期・時限" value={scheduleText} />
@@ -61,19 +61,19 @@ export function CourseDialog({
             <Row label="クラス" value={course.class_section} />
           )}
         </div>
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="">
           <Button variant="outline" size="sm" asChild>
             <a
-              href={syllabusUrl(course.code)}
+              href={syllabusUrl("2025", course.code)}
               target="_blank"
               rel="noopener noreferrer"
               className="gap-1"
             >
-              <IconExternalLink className="w-4 h-4" />
+              <IconExternalLink className="h-4 w-4" />
               シラバス
             </a>
           </Button>
-          <div className="flex gap-2 ml-auto">
+          <div className="ml-auto flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               閉じる
             </Button>
@@ -101,10 +101,8 @@ function Row({
 }) {
   return (
     <div className="grid grid-cols-3 items-baseline gap-2">
-      <span className="text-muted-foreground font-medium">{label}</span>
-      <span
-        className={`col-span-2 ${muted ? "text-muted-foreground" : ""}`}
-      >
+      <span className="font-medium text-muted-foreground">{label}</span>
+      <span className={`col-span-2 ${muted ? "text-muted-foreground" : ""}`}>
         {value}
       </span>
     </div>

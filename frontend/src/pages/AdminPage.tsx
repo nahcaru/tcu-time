@@ -3,8 +3,8 @@ import { ReviewPanel } from "@/components/admin/ReviewPanel"
 
 export function AdminPage() {
   return (
-    <div className="flex h-full flex-col md:-mx-6 md:-mt-6 md:p-6 lg:p-0">
-      <div className="flex-1 lg:p-6 lg:pl-8">
+    <div className="flex h-full flex-col p-4 md:p-6">
+      <div className="flex-1">
         <div className="mb-6">
           <h1 className="text-2xl font-bold tracking-tight">管理画面</h1>
           <p className="text-muted-foreground">

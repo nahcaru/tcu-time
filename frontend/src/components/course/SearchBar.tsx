@@ -8,13 +8,13 @@ interface SearchBarProps {
 
 export function SearchBar({ value, onChange }: SearchBarProps) {
   return (
-    <div className="relative w-full max-w-[300px]">
-      <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="relative w-full">
+      <IconSearch className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         placeholder="科目名・担当者で検索"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="pl-9 h-10"
+        className="h-10 pl-9"
       />
     </div>
   )

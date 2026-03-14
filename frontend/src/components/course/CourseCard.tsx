@@ -32,17 +32,17 @@ export function CourseCard({
 
   return (
     <Card
-      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 transition-all hover:bg-accent/40"
+      className="flex flex-col justify-between gap-4 p-4 transition-all hover:bg-accent/40 sm:flex-row sm:items-center"
       onClick={onClick}
     >
-      <div className="flex-1 space-y-1.5 min-w-0">
-        <div className="text-xs text-muted-foreground font-medium">
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="text-xs font-medium text-muted-foreground">
           {termText} {scheduleText}
         </div>
-        <span className="text-primary font-semibold block text-base truncate">
+        <span className="block truncate text-base font-semibold text-sidebar-primary">
           {course.name}
         </span>
-        <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="text-foreground">
             {course.instructors.join(", ")}
           </span>
@@ -61,11 +61,11 @@ export function CourseCard({
           }}
         >
           {isEnrolled ? (
-            <IconCheck className="w-4 h-4 mr-1" />
+            <IconCheck className="mr-1 h-4 w-4" />
           ) : (
-            <IconPlus className="w-4 h-4 mr-1" />
+            <IconPlus className="mr-1 h-4 w-4" />
           )}
-          {isEnrolled ? "登録済" : "登録"}
+          {isEnrolled ? "登録済み" : "登録する"}
         </Button>
       </div>
     </Card>

@@ -10,13 +10,19 @@ const SLOTS = [
 
 export function TimeSlots() {
   return (
-    <div className="rounded-md border overflow-x-auto bg-card">
+    <div className="overflow-x-auto rounded-md border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
             {SLOTS.map((slot) => (
-              <TableHead key={slot.id} className="text-center whitespace-nowrap px-4 py-3">
-                {slot.id}時限 <span className="text-xs text-muted-foreground ml-1">{slot.text}</span>
+              <TableHead
+                key={slot.id}
+                className="px-4 py-3 text-center whitespace-nowrap"
+              >
+                {slot.id}時限{" "}
+                <span className="ml-1 text-xs text-muted-foreground">
+                  {slot.text}
+                </span>
               </TableHead>
             ))}
           </TableRow>

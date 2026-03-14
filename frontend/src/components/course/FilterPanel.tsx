@@ -1,12 +1,12 @@
 import { IconFilter } from "@tabler/icons-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { TERMS, TARGETS } from "@/lib/constants"
@@ -53,7 +53,7 @@ function FilterContent({
   }
 
   const handleSelectAllTargets = () => {
-    onTargetsChange(TARGETS.map(t => t.code))
+    onTargetsChange(TARGETS.map((t) => t.code))
   }
 
   const handleClearTargets = () => {
@@ -74,12 +74,12 @@ function FilterContent({
           />
           <label
             htmlFor="registered"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
             登録済み
           </label>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <Checkbox
             id="freeslots"
@@ -90,7 +90,7 @@ function FilterContent({
           />
           <label
             htmlFor="freeslots"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
             空きコマのみ
           </label>
@@ -106,7 +106,7 @@ function FilterContent({
           />
           <label
             htmlFor="advance"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
             先行履修可
           </label>
@@ -145,7 +145,7 @@ function FilterContent({
             >
               全選択
             </Button>
-            <span className="text-muted-foreground text-xs">/</span>
+            <span className="text-xs text-muted-foreground">/</span>
             <Button
               variant="ghost"
               size="sm"
@@ -166,7 +166,7 @@ function FilterContent({
               />
               <label
                 htmlFor={`target-${target.code}`}
-                className="text-sm line-clamp-1"
+                className="line-clamp-1 text-sm"
                 title={target.label}
               >
                 {target.label}
@@ -184,29 +184,28 @@ export function FilterPanel(props: FilterPanelProps) {
 
   if (isMobile) {
     return (
-      <Sheet>
-        <SheetTrigger asChild>
+      <Drawer>
+        <DrawerTrigger asChild>
           <Button variant="outline" size="icon" className="shrink-0">
             <IconFilter className="h-4 w-4" />
             <span className="sr-only">フィルター</span>
           </Button>
-        </SheetTrigger>
-        <SheetContent
-          side="bottom"
-          className="h-[85vh] overflow-y-auto w-full"
-        >
-          <SheetHeader className="text-left">
-            <SheetTitle>絞り込み</SheetTitle>
-          </SheetHeader>
-          <FilterContent {...props} />
-        </SheetContent>
-      </Sheet>
+        </DrawerTrigger>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>フィルター</DrawerTitle>
+          </DrawerHeader>
+          <div className="no-scrollbar overflow-y-auto px-4">
+            <FilterContent {...props} />
+          </div>
+        </DrawerContent>
+      </Drawer>
     )
   }
 
   return (
-    <div className="w-[200px] shrink-0 border-r pr-6 hidden lg:block h-full overflow-y-auto no-scrollbar">
-      <h3 className="font-semibold mb-2">絞り込み</h3>
+    <div className="no-scrollbar hidden h-full shrink-0 overflow-y-auto lg:block">
+      <h3 className="font-semibold">フィルター</h3>
       <FilterContent {...props} />
     </div>
   )
