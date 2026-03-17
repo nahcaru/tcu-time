@@ -18,14 +18,14 @@ export type TargetCode = (typeof TARGETS)[number]["code"]
 
 /** Terms used in schedule data */
 export const TERMS = [
-  "前期",
-  "前集中",
   "前期前",
   "前期後",
-  "後期",
-  "後集中",
+  "前期",
+  "前集中",
   "後期前",
   "後期後",
+  "後期",
+  "後集中",
 ] as const
 
 export type Term = (typeof TERMS)[number]

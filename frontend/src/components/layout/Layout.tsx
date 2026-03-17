@@ -12,9 +12,9 @@ export function Layout() {
     <SidebarProvider defaultOpen>
       <TooltipProvider>
         <AppSidebar />
-        <SidebarInset className="overflow-hidden h-screen flex flex-col">
+        <Header />
+        <SidebarInset className="flex h-screen flex-col overflow-hidden">
           <ScrollProvider>
-            <Header />
             <MainContent />
             <BottomNav />
           </ScrollProvider>
@@ -35,11 +35,8 @@ function MainContent() {
   }, [location.pathname, scrollRootRef])
 
   return (
-    <main 
-      ref={scrollRootRef}
-      className="flex-1 overflow-auto pb-20 md:pb-0"
-    >
+    <div ref={scrollRootRef} className="flex-1 overflow-auto pb-20 md:pb-0">
       <Outlet />
-    </main>
+    </div>
   )
 }

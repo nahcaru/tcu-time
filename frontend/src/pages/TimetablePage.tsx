@@ -46,7 +46,7 @@ export function TimetablePage() {
         </TabsList>
       </PageHeader>
 
-      <div className="flex min-h-full w-full flex-1 flex-col px-4 md:px-6">
+      <div className="flex min-h-full w-full flex-1 flex-col px-4 pt-14 md:px-6 md:pt-0">
         <TabsContent value="spring">
           <SemesterContent
             regularCourses={

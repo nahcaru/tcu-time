@@ -93,16 +93,6 @@ export function useCourses(filters?: CourseFilters) {
     )
   }
 
-  // Text search (name or instructor)
-  if (filters?.search && filters.search.trim()) {
-    const q = filters.search.trim().toLowerCase()
-    courses = courses.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.instructors.some((i) => i.toLowerCase().includes(q))
-    )
-  }
-
   // Enrolled only filter
   if (filters?.enrolledOnly && filters.enrolledCourseIds) {
     courses = courses.filter((c) => filters.enrolledCourseIds!.has(c.id))
@@ -134,5 +124,18 @@ export function useCourses(filters?: CourseFilters) {
     courses = courses.filter((c) => c.advance_enrollment === true)
   }
 
-  return { courses, isLoading, error }
+  // Capture suggestion base (filters applied except text search)
+  const suggestionBase = courses
+
+  // Text search (name or instructor)
+  if (filters?.search && filters.search.trim()) {
+    const q = filters.search.trim().toLowerCase()
+    courses = courses.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.instructors.some((i) => i.toLowerCase().includes(q))
+    )
+  }
+
+  return { courses, suggestionBase, isLoading, error }
 }

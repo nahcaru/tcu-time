@@ -1,5 +1,4 @@
 import { IconFilter } from "@tabler/icons-react"
-import { useIsMobile } from "@/hooks/use-mobile"
 import {
   Drawer,
   DrawerContent,
@@ -9,7 +8,7 @@ import {
 } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { TERMS, TARGETS } from "@/lib/constants"
+import { TARGETS, SPRING_TERMS, FALL_TERMS } from "@/lib/constants"
 
 interface FilterPanelProps {
   selectedTargets: string[]
@@ -24,7 +23,7 @@ interface FilterPanelProps {
   onAdvanceEnrollmentOnlyChange: (advanceEnrollment: boolean) => void
 }
 
-function FilterContent({
+export function FilterContent({
   selectedTargets,
   selectedTerms,
   enrolledOnly,
@@ -58,6 +57,30 @@ function FilterContent({
 
   const handleClearTargets = () => {
     onTargetsChange([])
+  }
+
+  const handleSelectAllSpring = () => {
+    onTermsChange([...new Set([...selectedTerms, ...SPRING_TERMS])])
+  }
+
+  const handleClearSpring = () => {
+    onTermsChange(
+      selectedTerms.filter(
+        (term) => !(SPRING_TERMS as readonly string[]).includes(term)
+      )
+    )
+  }
+
+  const handleSelectAllFall = () => {
+    onTermsChange([...new Set([...selectedTerms, ...FALL_TERMS])])
+  }
+
+  const handleClearFall = () => {
+    onTermsChange(
+      selectedTerms.filter(
+        (term) => !(FALL_TERMS as readonly string[]).includes(term)
+      )
+    )
   }
 
   return (
@@ -116,19 +139,85 @@ function FilterContent({
       {/* 学期 */}
       <div className="space-y-2">
         <h4 className="text-sm font-semibold">学期</h4>
-        <div className="grid grid-cols-2 gap-3">
-          {TERMS.map((term) => (
-            <div key={term} className="flex items-center space-x-2">
-              <Checkbox
-                id={`term-${term}`}
-                checked={selectedTerms.includes(term)}
-                onCheckedChange={() => toggleTerm(term)}
-              />
-              <label htmlFor={`term-${term}`} className="text-sm">
-                {term}
-              </label>
+
+        {/* 前期系 */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between py-1">
+            <h5 className="text-xs font-medium">前期開講</h5>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                onClick={handleSelectAllSpring}
+              >
+                全選択
+              </Button>
+              <span className="text-xs text-muted-foreground">/</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                onClick={handleClearSpring}
+              >
+                クリア
+              </Button>
             </div>
-          ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {SPRING_TERMS.map((term) => (
+              <div key={term} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`term-${term}`}
+                  checked={selectedTerms.includes(term)}
+                  onCheckedChange={() => toggleTerm(term)}
+                />
+                <label htmlFor={`term-${term}`} className="text-sm">
+                  {term}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 後期系 */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between py-1">
+            <h5 className="text-xs font-medium">後期開講</h5>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                onClick={handleSelectAllFall}
+              >
+                全選択
+              </Button>
+              <span className="text-xs text-muted-foreground">/</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                onClick={handleClearFall}
+              >
+                クリア
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {FALL_TERMS.map((term) => (
+              <div key={term} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`term-${term}`}
+                  checked={selectedTerms.includes(term)}
+                  onCheckedChange={() => toggleTerm(term)}
+                />
+                <label htmlFor={`term-${term}`} className="text-sm">
+                  {term}
+                </label>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -180,33 +269,22 @@ function FilterContent({
 }
 
 export function FilterPanel(props: FilterPanelProps) {
-  const isMobile = useIsMobile()
-
-  if (isMobile) {
-    return (
-      <Drawer>
-        <DrawerTrigger asChild>
-          <Button variant="outline" size="icon" className="shrink-0">
-            <IconFilter className="h-4 w-4" />
-            <span className="sr-only">フィルター</span>
-          </Button>
-        </DrawerTrigger>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>フィルター</DrawerTitle>
-          </DrawerHeader>
-          <div className="no-scrollbar overflow-y-auto px-4">
-            <FilterContent {...props} />
-          </div>
-        </DrawerContent>
-      </Drawer>
-    )
-  }
-
   return (
-    <div className="no-scrollbar hidden h-full shrink-0 overflow-y-auto lg:block">
-      <h3 className="font-semibold">フィルター</h3>
-      <FilterContent {...props} />
-    </div>
+    <Drawer>
+      <DrawerTrigger asChild>
+        <Button variant="outline" size="icon" className="shrink-0">
+          <IconFilter className="h-4 w-4" />
+          <span className="sr-only">フィルター</span>
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>フィルター</DrawerTitle>
+        </DrawerHeader>
+        <div className="no-scrollbar overflow-y-auto px-4">
+          <FilterContent {...props} />
+        </div>
+      </DrawerContent>
+    </Drawer>
   )
 }
