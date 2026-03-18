@@ -1,16 +1,25 @@
 import { useState } from "react"
-import { IconUser, IconSun, IconMoon, IconLogin } from "@tabler/icons-react"
+import { IconSun, IconMoon, IconLogin } from "@tabler/icons-react"
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 import { LoginDialog } from "@/components/auth/LoginDialog"
 import { ProfileDialog } from "@/components/auth/ProfileDialog"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 export function Header() {
   const { theme, setTheme } = useTheme()
   const { user } = useAuth()
 
   const [loginOpen, setLoginOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
+  const displayName =
+    user?.user_metadata?.full_name ??
+    user?.user_metadata?.name ??
+    user?.email?.split("@")[0] ??
+    "ユーザー"
+
+  const avatarUrl = user?.user_metadata?.avatar_url
 
   return (
     <>
@@ -22,20 +31,21 @@ export function Header() {
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === "dark" ? (
-              <IconMoon className="h-5 w-5" />
-            ) : (
-              <IconSun className="h-5 w-5" />
-            )}
+            {theme === "dark" ? <IconMoon /> : <IconSun />}
           </Button>
 
           {user ? (
             <Button
               variant="ghost"
-              size="icon"
+              className="h-8 w-8 rounded-full p-0"
               onClick={() => setProfileOpen(true)}
             >
-              <IconUser className="h-5 w-5" />
+              <Avatar className="h-8 w-8 border">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                <AvatarFallback className="text-xs">
+                  {displayName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
             </Button>
           ) : (
             <Button

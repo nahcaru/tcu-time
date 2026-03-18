@@ -17,13 +17,13 @@ export function GridCell({ state, courseName, onClick }: GridCellProps) {
         state === "empty" &&
           "border-dashed border-muted-foreground/30 bg-transparent hover:bg-muted/50",
         state === "single" &&
-          "border-transparent bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+          "border bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         state === "conflict" &&
-          "text-destructive-foreground border-transparent bg-destructive font-medium shadow-sm hover:bg-destructive/90"
+          "text-destructive-foreground border bg-destructive font-medium shadow-sm hover:bg-destructive/90"
       )}
     >
       {state === "single" && (
-        <span className="line-clamp-2 md:line-clamp-3">{courseName}</span>
+        <span className="line-clamp-2 text-ellipsis">{courseName}</span>
       )}
       {state === "conflict" && <span>重複</span>}
     </div>

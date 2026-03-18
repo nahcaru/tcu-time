@@ -49,24 +49,24 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
   }, [settings?.earned_credits])
 
   // Editable earned credits
-  const [earnedPractical, setEarnedPractical] = useState(0)
-  const [earnedResearch, setEarnedResearch] = useState(0)
-  const [earnedLectures, setEarnedLectures] = useState(0)
+  const [earnedPractical, setEarnedPractical] = useState("0")
+  const [earnedResearch, setEarnedResearch] = useState("0")
+  const [earnedLectures, setEarnedLectures] = useState("0")
 
   // Sync from settings to local state
   useEffect(() => {
-    setEarnedPractical(earnedCredits.practical)
-    setEarnedResearch(earnedCredits.research)
-    setEarnedLectures(earnedCredits.lectures)
+    setEarnedPractical(earnedCredits.practical.toString())
+    setEarnedResearch(earnedCredits.research.toString())
+    setEarnedLectures(earnedCredits.lectures.toString())
   }, [earnedCredits])
 
   // Debounce updates to settings
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       const current = {
-        practical: earnedPractical,
-        research: earnedResearch,
-        lectures: earnedLectures,
+        practical: parseFloat(earnedPractical) || 0,
+        research: parseFloat(earnedResearch) || 0,
+        lectures: parseFloat(earnedLectures) || 0,
       }
       if (JSON.stringify(current) !== JSON.stringify(earnedCredits)) {
         updateSettings({ earned_credits: current })
@@ -119,11 +119,14 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
 
   // First column base values (with Spring addition if checking Fall view)
   const basePractical =
-    earnedPractical + (isSpring ? 0 : computedCredits.spring.practical)
+    (parseFloat(earnedPractical) || 0) +
+    (isSpring ? 0 : computedCredits.spring.practical)
   const baseResearch =
-    earnedResearch + (isSpring ? 0 : computedCredits.spring.research)
+    (parseFloat(earnedResearch) || 0) +
+    (isSpring ? 0 : computedCredits.spring.research)
   const baseLectures =
-    earnedLectures + (isSpring ? 0 : computedCredits.spring.lectures)
+    (parseFloat(earnedLectures) || 0) +
+    (isSpring ? 0 : computedCredits.spring.lectures)
 
   // Totals for Column 4 (Grand total in that row)
   const totalPractical = basePractical + currentTermCredits.practical
@@ -182,13 +185,10 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                 <TableCell className="text-right">
                   {isSpring ? (
                     <Input
-                      type="number"
-                      step="0.5"
                       value={earnedPractical}
-                      onChange={(e) =>
-                        setEarnedPractical(parseFloat(e.target.value) || 0)
-                      }
-                      className="ml-auto h-7 w-16 bg-background text-right text-sm"
+                      onChange={(e) => setEarnedPractical(e.target.value)}
+                      className="h-7 w-16 bg-background text-center text-sm"
+                      aria-invalid={isNaN(Number(earnedPractical)) ? "true" : undefined}
                     />
                   ) : (
                     basePractical.toFixed(1)
@@ -213,13 +213,10 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                 <TableCell className="text-right">
                   {isSpring ? (
                     <Input
-                      type="number"
-                      step="0.5"
                       value={earnedResearch}
-                      onChange={(e) =>
-                        setEarnedResearch(parseFloat(e.target.value) || 0)
-                      }
-                      className="ml-auto h-7 w-16 bg-background text-right text-sm"
+                      onChange={(e) => setEarnedResearch(e.target.value)}
+                      className="h-7 w-16 bg-background text-center text-sm"
+                      aria-invalid={isNaN(Number(earnedResearch)) ? "true" : undefined}
                     />
                   ) : (
                     baseResearch.toFixed(1)
@@ -265,13 +262,10 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                 <TableCell className="text-right">
                   {isSpring ? (
                     <Input
-                      type="number"
-                      step="0.5"
                       value={earnedLectures}
-                      onChange={(e) =>
-                        setEarnedLectures(parseFloat(e.target.value) || 0)
-                      }
-                      className="ml-auto h-7 w-16 bg-background text-right text-sm"
+                      onChange={(e) => setEarnedLectures(e.target.value)}
+                      className="h-7 w-16 bg-background text-center text-sm"
+                      aria-invalid={isNaN(Number(earnedLectures)) ? "true" : undefined}
                     />
                   ) : (
                     baseLectures.toFixed(1)
@@ -321,7 +315,7 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
             </span>
           </p>
           <p className="flex items-start gap-1">
-            <span className="mt-0.5 text-primary">•</span>
+            <span className="mt-0.5">•</span>
             <span>
               英語での開講科目から{" "}
               <strong className="text-foreground">2単位以上</strong>{" "}

@@ -11,7 +11,8 @@ import type { CourseWithRelations } from "@/lib/database.types"
 import { PageHeader } from "@/components/layout/PageHeader"
 
 export function TimetablePage() {
-  const { enrolledCourseIds } = useEnrollments()
+  const { enrolledCourseIds, addEnrollment, removeEnrollment } =
+    useEnrollments()
   const { courses: allCourses } = useCourses()
 
   // Filter to only enrolled courses
@@ -59,6 +60,9 @@ export function TimetablePage() {
             firstHalfTerms={["前期前", "前期"]}
             secondHalfTerms={["前期後", "前期"]}
             termType="前期"
+            addEnrollment={addEnrollment}
+            removeEnrollment={removeEnrollment}
+            enrolledCourseIds={enrolledCourseIds}
           />
         </TabsContent>
 
@@ -72,6 +76,9 @@ export function TimetablePage() {
             firstHalfTerms={["後期前", "後期"]}
             secondHalfTerms={["後期後", "後期"]}
             termType="後期"
+            addEnrollment={addEnrollment}
+            removeEnrollment={removeEnrollment}
+            enrolledCourseIds={enrolledCourseIds}
           />
         </TabsContent>
       </div>
@@ -86,6 +93,9 @@ function SemesterContent({
   firstHalfTerms,
   secondHalfTerms,
   termType,
+  addEnrollment,
+  removeEnrollment,
+  enrolledCourseIds,
 }: {
   regularCourses: CourseWithRelations[]
   intensiveCourses: CourseWithRelations[]
@@ -93,6 +103,9 @@ function SemesterContent({
   firstHalfTerms: string[]
   secondHalfTerms: string[]
   termType: "前期" | "後期"
+  addEnrollment: (courseId: string) => Promise<void>
+  removeEnrollment: (courseId: string) => Promise<void>
+  enrolledCourseIds: Set<string>
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -102,13 +115,25 @@ function SemesterContent({
           title="前半"
           terms={firstHalfTerms}
           enrolledCourses={regularCourses}
+          addEnrollment={addEnrollment}
+          removeEnrollment={removeEnrollment}
+          enrolledCourseIds={enrolledCourseIds}
         />
         <CourseGrid
           title="後半"
           terms={secondHalfTerms}
           enrolledCourses={regularCourses}
+          addEnrollment={addEnrollment}
+          removeEnrollment={removeEnrollment}
+          enrolledCourseIds={enrolledCourseIds}
         />
-        <IntensiveCourses courses={intensiveCourses} />
+        <IntensiveCourses
+          courses={intensiveCourses}
+          terms={termType === "前期" ? ["前集中"] : ["後集中"]}
+          addEnrollment={addEnrollment}
+          removeEnrollment={removeEnrollment}
+          enrolledCourseIds={enrolledCourseIds}
+        />
         <CreditsTable termType={termType} enrolledCourses={enrolledCourses} />
       </div>
     </div>

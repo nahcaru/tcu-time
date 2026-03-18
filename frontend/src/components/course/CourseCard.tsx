@@ -2,6 +2,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { IconPlus, IconCheck } from "@tabler/icons-react"
 import type { CourseWithRelations } from "@/lib/database.types"
+import { syllabusUrl } from "@/lib/constants"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface CourseCardProps {
   course: CourseWithRelations
@@ -16,56 +18,58 @@ export function CourseCard({
   onToggleEnroll,
   onClick,
 }: CourseCardProps) {
+  const isMobile = useIsMobile()
+
   // Build schedule summary: "前期後 月1・木1"
   const scheduleText = course.schedules
     .map((s) => `${s.day}${s.period}`)
     .join("・")
   const termText = [...new Set(course.schedules.map((s) => s.term))].join(", ")
 
-  // Build target summary: "02機械"
-  const targetText = course.course_targets
-    .map((t) => `${t.target_code}${t.target_name}`)
-    .join(", ")
-
   // Credits from metadata (pick first, they should be the same across curricula)
   const credits = course.course_metadata[0]?.credits
 
   return (
     <Card
-      className="flex flex-col justify-between gap-4 p-4 transition-all hover:bg-accent/40 sm:flex-row sm:items-center"
+      className="flex flex-row items-center justify-between gap-4 p-4 transition-all hover:bg-accent/40"
       onClick={onClick}
     >
       <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="text-xs font-medium text-muted-foreground">
+        <div className="text-sm font-medium text-muted-foreground">
           {termText} {scheduleText}
         </div>
-        <span className="block truncate text-base font-semibold text-sidebar-primary">
+        <a
+          href={syllabusUrl(course.academic_year.toString(), course.code)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block max-w-full truncate text-lg font-semibold text-sidebar-primary hover:underline"
+          onClick={(e) => {
+            e.stopPropagation()
+          }}
+        >
           {course.name}
-        </span>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        </a>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span className="text-foreground">
-            {course.instructors.join(", ")}
+            {course.instructors.length >= 3
+              ? `${course.instructors[0]} 他`
+              : course.instructors.join(", ")}
           </span>
-          {targetText && <span>対象[{targetText}]</span>}
           {credits != null && <span>{credits}単位</span>}
         </div>
       </div>
       <div>
         <Button
           variant={isEnrolled ? "outline" : "default"}
-          size="sm"
-          className="w-full sm:w-auto"
+          size={isMobile ? "icon-lg" : "default"}
+          className="rounded-full"
           onClick={(e) => {
             e.stopPropagation()
             onToggleEnroll?.()
           }}
         >
-          {isEnrolled ? (
-            <IconCheck className="mr-1 h-4 w-4" />
-          ) : (
-            <IconPlus className="mr-1 h-4 w-4" />
-          )}
-          {isEnrolled ? "登録済み" : "登録する"}
+          {isEnrolled ? <IconCheck /> : <IconPlus />}
+          {!isMobile && <span>{isEnrolled ? "登録済み" : "登録する"}</span>}
         </Button>
       </div>
     </Card>

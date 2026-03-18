@@ -23,7 +23,12 @@ export function CoursesPage() {
     useEnrollments()
 
   // Courses with filters
-  const { courses, suggestionBase = [], isLoading, error } = useCourses({
+  const {
+    courses,
+    suggestionBase = [],
+    isLoading,
+    error,
+  } = useCourses({
     targets: selectedTargets,
     terms: selectedTerms,
     search,
@@ -95,7 +100,7 @@ export function CoursesPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="min-w-0 flex-1 px-4 py-4 md:px-6 lg:overflow-y-auto">
+        <div className="min-w-0 flex-1 px-2 py-4 md:px-6 lg:overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />

@@ -115,7 +115,7 @@ export function FilterContent({
             htmlFor="freeslots"
             className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
-            空きコマのみ
+            空きコマ
           </label>
         </div>
 

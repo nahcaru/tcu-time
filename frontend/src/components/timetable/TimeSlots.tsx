@@ -1,32 +1,37 @@
-import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-
-const SLOTS = [
-  { id: 1, text: "9:20-11:00" },
-  { id: 2, text: "11:10-12:50" },
-  { id: 3, text: "13:40-15:20" },
-  { id: 4, text: "15:30-17:10" },
-  { id: 5, text: "17:20-19:00" },
-]
+import { PERIOD_TIMES, PERIOD_TIMES_NUCLEAR } from "@/lib/constants"
+import { useSettings } from "@/hooks/use-settings"
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table"
 
 export function TimeSlots() {
+  const { settings } = useSettings()
+  const isNuclear = settings?.department === "06"
+  const times = isNuclear ? PERIOD_TIMES_NUCLEAR : PERIOD_TIMES
+
+  const slots = Object.entries(times).map(([id, text]) => ({
+    id: parseInt(id),
+    text,
+  }))
+
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
+    <div className="overflow-hidden rounded-md border bg-card">
       <Table>
-        <TableHeader>
-          <TableRow>
-            {SLOTS.map((slot) => (
-              <TableHead
+        <TableBody>
+          <TableRow className="flex flex-col divide-y divide-border hover:bg-transparent md:table-row md:divide-x md:divide-y-0">
+            {slots.map((slot) => (
+              <TableCell
                 key={slot.id}
-                className="px-4 py-3 text-center whitespace-nowrap"
+                className="flex items-center justify-between px-4 py-1.5 text-foreground md:table-cell md:px-2 md:text-center"
               >
-                {slot.id}時限{" "}
-                <span className="ml-1 text-xs text-muted-foreground">
+                <div className="text-xs font-semibold md:text-sm">
+                  {slot.id}時限
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground md:mt-0.5 md:text-xs">
                   {slot.text}
-                </span>
-              </TableHead>
+                </div>
+              </TableCell>
             ))}
           </TableRow>
-        </TableHeader>
+        </TableBody>
       </Table>
     </div>
   )

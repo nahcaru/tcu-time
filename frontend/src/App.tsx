@@ -3,18 +3,21 @@ import { Layout } from "@/components/layout/Layout"
 import { CoursesPage } from "@/pages/CoursesPage"
 import { TimetablePage } from "@/pages/TimetablePage"
 import { AdminPage } from "@/pages/AdminPage"
+import { SettingsProvider } from "@/hooks/use-settings"
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<CoursesPage />} />
-          <Route path="timetable" element={<TimetablePage />} />
-          <Route path="admin" element={<AdminPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <SettingsProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<CoursesPage />} />
+            <Route path="timetable" element={<TimetablePage />} />
+            <Route path="admin" element={<AdminPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </SettingsProvider>
   )
 }
 

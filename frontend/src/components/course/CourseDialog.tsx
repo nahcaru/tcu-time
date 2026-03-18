@@ -28,40 +28,70 @@ export function CourseDialog({
   if (!course) return null
 
   const scheduleText = course.schedules
-    .map((s) => `${s.term} ${s.day}${s.period}`)
-    .join(", ")
+    .map((s) => `${s.day}${s.period}`)
+    .join("・")
+  const termText = [...new Set(course.schedules.map((s) => s.term))].join(", ")
 
   const rooms = [
     ...new Set(course.schedules.map((s) => s.room).filter(Boolean)),
   ]
 
-  const targetText = course.course_targets
-    .map(
-      (t) => `${t.target_code}${t.target_name}${t.note ? `(${t.note})` : ""}`
-    )
-    .join(", ")
+  const targetItems = course.course_targets.map(
+    (t) => `${t.target_code}${t.target_name}${t.note ? `(${t.note})` : ""}`
+  )
 
   const credits = course.course_metadata[0]?.credits
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl">{course.name}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 py-4 text-sm">
-          <Row label="学期・時限" value={scheduleText} />
-          <Row label="担当者" value={course.instructors.join(", ")} />
+          <Row label="学期・時限" value={`${termText} ${scheduleText}`} />
+          <Row
+            label="担当者"
+            value={
+              <div className="flex flex-col">
+                {course.instructors.map((instructor, i) => (
+                  <span key={i}>{instructor}</span>
+                ))}
+              </div>
+            }
+          />
           {credits != null && <Row label="単位数" value={String(credits)} />}
           <Row label="講義コード" value={course.code} muted />
-          {rooms.length > 0 && <Row label="教室" value={rooms.join(", ")} />}
-          {targetText && <Row label="受講対象" value={targetText} />}
+          {rooms.length > 0 && (
+            <Row
+              label="教室"
+              value={
+                <div className="flex flex-col">
+                  {rooms.map((room, i) => (
+                    <span key={i}>{room}</span>
+                  ))}
+                </div>
+              }
+            />
+          )}
+          {targetItems.length > 0 && (
+            <Row
+              label="受講対象"
+              value={
+                <div className="flex flex-col">
+                  {targetItems.map((item, i) => (
+                    <span key={i}>{item}</span>
+                  ))}
+                </div>
+              }
+            />
+          )}
           {course.notes && <Row label="備考" value={course.notes} />}
           {course.class_section && (
             <Row label="クラス" value={course.class_section} />
           )}
         </div>
-        <DialogFooter className="">
+        <DialogFooter className="flex-row">
           <Button variant="outline" size="sm" asChild>
             <a
               href={syllabusUrl("2025", course.code)}
@@ -81,7 +111,7 @@ export function CourseDialog({
               variant={isEnrolled ? "destructive" : "default"}
               onClick={onToggleEnroll}
             >
-              {isEnrolled ? "登録取消" : "登録"}
+              {isEnrolled ? "登録取消" : "登録する"}
             </Button>
           </div>
         </DialogFooter>
@@ -96,7 +126,7 @@ function Row({
   muted,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   muted?: boolean
 }) {
   return (

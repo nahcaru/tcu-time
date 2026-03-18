@@ -17,7 +17,6 @@ import {
   IconTableFilled,
   IconSun,
   IconMoon,
-  IconInfoCircle,
   IconLogin,
 } from "@tabler/icons-react"
 import { useTheme } from "@/components/theme-provider"
@@ -86,12 +85,6 @@ export function AppSidebar() {
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="情報">
-                <IconInfoCircle />
-                <span>情報</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

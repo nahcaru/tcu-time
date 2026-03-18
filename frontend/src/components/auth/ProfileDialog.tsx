@@ -1,12 +1,4 @@
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { IconLogout, IconTrash } from "@tabler/icons-react"
 import {
@@ -21,7 +13,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/hooks/use-auth"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface ProfileDialogProps {
   open: boolean
@@ -46,67 +44,83 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] border-0 shadow-none p-0 bg-transparent">
-        <div className="mx-auto w-full max-w-xl space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>プロフィール</CardTitle>
-              <CardDescription>アカウント情報と設定の管理</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-              <Avatar className="h-24 w-24 border">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                <AvatarFallback>
-                  {displayName.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="space-y-1">
-                <h3 className="text-lg font-semibold">{displayName}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {user?.email ?? ""}
-                </p>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-start">
-              <Button variant="outline" className="gap-2" onClick={handleSignOut}>
-                <IconLogout className="h-4 w-4" />
-                ログアウト
-              </Button>
-            </CardFooter>
-          </Card>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>プロフィール</DialogTitle>
+          <DialogDescription>アカウント情報と設定の管理</DialogDescription>
+        </DialogHeader>
 
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="text-destructive">危険な操作</CardTitle>
-              <CardDescription>
-                アカウントの削除は元に戻せません。すべてのデータが失われます。
-              </CardDescription>
-            </CardHeader>
-            <CardFooter>
+        <div className="grid gap-5 py-4">
+          {/* ユーザー情報セクション */}
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16 border">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+              <AvatarFallback className="text-lg">
+                {displayName.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="space-y-0.5">
+              <h3 className="text-base font-semibold">{displayName}</h3>
+              <p className="max-w-[240px] overflow-hidden text-sm text-ellipsis whitespace-nowrap text-muted-foreground">
+                {user?.email ?? ""}
+              </p>
+            </div>
+          </div>
+
+          {/* ログアウトアクション */}
+          <div className="flex justify-start">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 text-sm"
+              onClick={handleSignOut}
+            >
+              <IconLogout className="h-4 w-4" />
+              ログアウト
+            </Button>
+          </div>
+
+          <div className="my-1 border-t" />
+
+          {/* 危険な操作セクション */}
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+            <div className="space-y-1">
+              <h4 className="flex items-center gap-1.5 text-sm font-semibold text-destructive">
+                危険な操作
+              </h4>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                アカウントの削除は元に戻せません。登録した時間割などのデータが完全に消去されます。
+              </p>
+            </div>
+            <div className="mt-3">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="gap-2">
-                    <IconTrash className="h-4 w-4" />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                  >
+                    <IconTrash className="h-3.5 w-3.5" />
                     アカウントを削除
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="max-w-[340px] sm:max-w-[425px]">
                   <AlertDialogHeader>
                     <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
                     <AlertDialogDescription>
                       この操作は取り消せません。設定と登録科目のデータが完全に削除されます。
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                    <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  <AlertDialogFooter className="gap-2 sm:gap-0">
+                    <AlertDialogCancel size="sm">キャンセル</AlertDialogCancel>
+                    <AlertDialogAction className="text-destructive-foreground h-9 bg-destructive text-sm hover:bg-destructive/90">
                       削除する
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
