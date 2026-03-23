@@ -63,7 +63,7 @@ export function AddCourseDialog({
   const slotCourses = useMemo(() => {
     if (day === "集中") {
       return courses.filter((c) =>
-        c.schedules.some((s) => s.term.includes("集中"))
+        c.term != null && c.term.includes("集中")
       )
     }
     if (!day || !period) return []

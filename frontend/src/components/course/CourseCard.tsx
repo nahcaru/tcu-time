@@ -24,7 +24,7 @@ export function CourseCard({
   const scheduleText = course.schedules
     .map((s) => `${s.day}${s.period}`)
     .join("・")
-  const termText = [...new Set(course.schedules.map((s) => s.term))].join(", ")
+  const termText = course.term ?? ""
 
   // Credits from metadata (pick first, they should be the same across curricula)
   const credits = course.course_metadata[0]?.credits

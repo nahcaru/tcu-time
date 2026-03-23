@@ -78,7 +78,7 @@ class PDFMetadata(BaseModel):
 # Changelog models
 # ---------------------------------------------------------------------------
 
-ChangeType = Literal["add", "modify", "cancel"]
+ChangeType = Literal["create", "update", "delete"]
 
 
 class FieldChange(BaseModel):
@@ -107,7 +107,6 @@ class ChangeEntry(BaseModel):
     day: str | None = None
     period: int | str | None = None
     changes: list[FieldChange] = []
-    reason: str | None = None
 
     @field_validator("period", mode="before")
     @classmethod
@@ -126,11 +125,14 @@ class ChangeEntry(BaseModel):
             return s
 
 
+# ---------------------------------------------------------------------------
+# Course data models (Gemini extraction output)
+# ---------------------------------------------------------------------------
+
+
 class Schedule(BaseModel):
-    term: str
     day: str
     period: int
-    room: str = ""
 
     @field_validator("day")
     @classmethod
@@ -144,13 +146,6 @@ class Schedule(BaseModel):
     def validate_period(cls, v: int) -> int:
         if not 1 <= v <= 5:
             raise ValueError(f"Invalid period: {v}. Must be 1-5")
-        return v
-
-    @field_validator("term")
-    @classmethod
-    def validate_term(cls, v: str) -> str:
-        if v not in VALID_TERMS:
-            raise ValueError(f"Invalid term: {v}. Must be one of {VALID_TERMS}")
         return v
 
 
@@ -167,6 +162,8 @@ class ExtractedCourse(BaseModel):
     year_level: int = 1
     class_section: str = ""
     semester: Semester | None = None
+    term: str | None = None
+    room: str | None = None
     schedules: list[Schedule]
     target_raw: str = ""
     targets: list[CourseTarget] = []

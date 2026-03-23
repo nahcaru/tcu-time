@@ -1,28 +1,15 @@
 import { ExtractionList } from "@/components/admin/ExtractionList"
-import { ReviewPanel } from "@/components/admin/ReviewPanel"
 
 export function AdminPage() {
   return (
-    <div className="flex h-full flex-col p-4 md:p-6">
-      <div className="flex-1">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight">管理画面</h1>
-          <p className="text-muted-foreground">
-            シラバス抽出タスクのステータス管理と承認
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <h2 className="mb-4 text-lg font-semibold">最近の抽出処理</h2>
-            <ExtractionList />
-          </div>
-          <div className="lg:col-span-1">
-            <h2 className="mb-4 text-lg font-semibold">レビュー</h2>
-            <ReviewPanel />
-          </div>
-        </div>
+    <div className="container py-8 space-y-6">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold">管理パネル</h1>
+        <p className="text-sm text-muted-foreground">
+          抽出タスクの確認と承認を行います。承認された内容が授業データに反映されます。
+        </p>
       </div>
+      <ExtractionList />
     </div>
   )
 }

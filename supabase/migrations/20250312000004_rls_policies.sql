@@ -34,11 +34,11 @@ CREATE POLICY "settings_update" ON user_settings
 -- Extractions: admin only
 ALTER TABLE extractions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "extractions_admin_read" ON extractions
-  FOR SELECT USING (auth.jwt() ->> 'role' = 'admin');
+  FOR SELECT USING (auth.jwt() -> 'app_metadata' ->> 'role' = 'admin');
 CREATE POLICY "extractions_admin_write" ON extractions
-  FOR ALL USING (auth.jwt() ->> 'role' = 'admin');
+  FOR ALL USING (auth.jwt() -> 'app_metadata' ->> 'role' = 'admin');
 
 -- PDF links: admin only
 ALTER TABLE pdf_links ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "pdf_links_admin" ON pdf_links
-  FOR ALL USING (auth.jwt() ->> 'role' = 'admin');
+  FOR ALL USING (auth.jwt() -> 'app_metadata' ->> 'role' = 'admin');

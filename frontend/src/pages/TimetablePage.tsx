@@ -24,15 +24,13 @@ export function TimetablePage() {
   // Intensive courses = those with 集中 in their term
   const intensiveCourses = (terms: readonly string[]) =>
     enrolledCourses.filter((c) =>
-      c.schedules.some((s) => terms.includes(s.term) && s.term.includes("集中"))
+      c.term != null && terms.includes(c.term) && c.term.includes("集中")
     )
 
   // Regular (non-intensive) enrolled courses for grid display
   const regularCourses = (terms: readonly string[]) =>
     enrolledCourses.filter((c) =>
-      c.schedules.some(
-        (s) => terms.includes(s.term) && !s.term.includes("集中")
-      )
+      c.term != null && terms.includes(c.term) && !c.term.includes("集中")
     )
 
   return (

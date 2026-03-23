@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from dataclasses import dataclass
 from typing import Iterator
 
@@ -137,8 +138,16 @@ def extract_pdf_links(
     # Step 4 — collect elements between this <h4> and the next <h4> / <hr>
     seen: set[str] = set()
     links: list[PdfLink] = []
+    current_semester_prefix = ""
 
     for sibling in _iter_siblings_until(target_h4, {"h4", "hr"}):
+        if sibling.name == "h5":
+            text_h5 = sibling.get_text(strip=True)
+            if "前期" in text_h5:
+                current_semester_prefix = "【前期】"
+            elif "後期" in text_h5:
+                current_semester_prefix = "【後期】"
+
         for anchor in sibling.find_all("a", href=True) if sibling.name != "a" else [sibling]:
             href = str(anchor["href"])
             text: str = anchor.get_text(strip=True)
@@ -157,7 +166,7 @@ def extract_pdf_links(
             seen.add(href)
 
             # Prefix label with department for downstream context
-            label = f"〈{department}〉{text}"
+            label = f"〈{department}〉{current_semester_prefix}{text}"
             links.append(PdfLink(url=href, label=label))
 
     logger.info(
@@ -285,6 +294,25 @@ def classify_pdf_link(link_text: str) -> PDFMetadata:
 # ---------------------------------------------------------------------------
 
 
+def _extract_academic_year(soup: BeautifulSoup) -> int:
+    """Extract academic year (e.g. 2025) from page title or headings.
+    Falls back to calculating from current date.
+    """
+    title_text = soup.title.get_text() if soup.title else ""
+    match = re.search(r"(\d{4})年度", title_text)
+    if match:
+        return int(match.group(1))
+
+    for header in soup.find_all(["h1", "h2", "h3"]):
+        match = re.search(r"(\d{4})年度", header.get_text())
+        if match:
+            return int(match.group(1))
+
+    from datetime import date
+    today = date.today()
+    return today.year if today.month >= 4 else today.year - 1
+
+
 def check_for_updates(
     target_url: str = Config.TARGET_URL,
 ) -> list[dict[str, str]]:
@@ -295,6 +323,9 @@ def check_for_updates(
     ``"changed"``.
     """
     html = fetch_page(target_url)
+    soup = BeautifulSoup(html, "html.parser")
+    academic_year = _extract_academic_year(soup)
+
     current_links = extract_pdf_links(html)
     current_links.extend(extract_advance_pdf_links(html))
 
@@ -342,6 +373,7 @@ def check_for_updates(
                 pdf_type=metadata.pdf_type.value,
                 semester=metadata.semester.value if metadata.semester else "spring",
                 is_tentative=metadata.is_tentative,
+                academic_year=academic_year,
             )
 
             queued.append({

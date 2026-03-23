@@ -18,12 +18,14 @@ erDiagram
 
     courses {
         uuid id PK
-        text code UK "smab020161"
+        text code "smab020161"
+        int academic_year "2025"
         text name "ロボティクス特論"
         text[] instructors "佐藤 大祐"
+        text term "前期後"
+        text room "22A"
         int year_level "1"
         text class_section ""
-        int academic_year "2025"
         text source_type "timetable or changelog"
         boolean is_tentative "false"
         boolean advance_enrollment "false"
@@ -36,10 +38,8 @@ erDiagram
     schedules {
         uuid id PK
         uuid course_id FK
-        text term "前期後"
         text day "月"
         int period "1"
-        text room "22A"
     }
 
     course_targets {
@@ -92,12 +92,14 @@ erDiagram
 ```sql
 CREATE TABLE courses (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code          TEXT UNIQUE NOT NULL,
+  code          TEXT NOT NULL,
+  academic_year INT NOT NULL,
   name          TEXT NOT NULL,
   instructors   TEXT[] NOT NULL,
+  term          TEXT DEFAULT '',
+  room          TEXT DEFAULT '',
   year_level    INT DEFAULT 1,
   class_section TEXT DEFAULT '',
-  academic_year INT NOT NULL,
   notes         TEXT DEFAULT '',
   source_type   TEXT DEFAULT 'timetable'
                CHECK (source_type IN ('timetable', 'changelog')),
@@ -107,7 +109,8 @@ CREATE TABLE courses (
                CHECK (status IN ('active', 'cancelled')),
   extraction_id UUID REFERENCES extractions(id),
   created_at    TIMESTAMPTZ DEFAULT now(),
-  updated_at    TIMESTAMPTZ DEFAULT now()
+  updated_at    TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(code, academic_year)
 );
 
 -- インデックス
@@ -121,15 +124,13 @@ CREATE INDEX idx_courses_academic_year ON courses(academic_year);
 CREATE TABLE schedules (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   course_id  UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  term       TEXT NOT NULL,
   day        TEXT NOT NULL CHECK (day IN ('月','火','水','木','金','土')),
   period     INT NOT NULL CHECK (period BETWEEN 1 AND 5),
-  room       TEXT DEFAULT '',
-  UNIQUE(course_id, term, day, period)
+  UNIQUE(course_id, day, period)
 );
 
 -- 時間割表示用インデックス
-CREATE INDEX idx_schedules_slot ON schedules(term, day, period);
+CREATE INDEX idx_schedules_slot ON schedules(day, period);
 CREATE INDEX idx_schedules_course ON schedules(course_id);
 ```
 
@@ -175,7 +176,7 @@ CREATE TABLE extractions (
   is_tentative  BOOLEAN DEFAULT false,
   academic_year INT NOT NULL,
   status        TEXT DEFAULT 'pending'
-                CHECK (status IN ('pending','extracted','pending_review','approved','rejected')),
+                CHECK (status IN ('pending','extracted','approved')),
   raw_json      JSONB,
   error_log     TEXT,
   reviewed_by   UUID REFERENCES auth.users(id),
@@ -227,7 +228,7 @@ CREATE POLICY "settings_own" ON user_settings
 -- 抽出管理: 管理者のみ
 ALTER TABLE extractions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "extractions_admin" ON extractions
-  USING (auth.jwt() ->> 'role' = 'admin');
+  USING (auth.jwt() -> 'app_metadata' ->> 'role' = 'admin');
 ```
 
 ## 対開講のデータ表現

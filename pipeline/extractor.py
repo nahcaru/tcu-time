@@ -19,6 +19,8 @@ from typing import Any
 
 import pdfplumber
 import requests
+from google import genai
+
 
 from pipeline.config import Config
 from pipeline.models import (
@@ -57,7 +59,7 @@ _I_ROOM = 5
 _I_TARGET = 6
 
 # Column count thresholds for auto-detecting table type
-_REGULAR_COL_COUNT = 10   # Regular tables have 10 columns
+_REGULAR_COL_COUNT = 10  # Regular tables have 10 columns
 _INTENSIVE_COL_COUNT = 7  # Intensive tables have 7 columns
 
 
@@ -99,86 +101,131 @@ class _TablePage:
         self.semester = semester
 
 
-def extract_tables_from_pdf(
-    pdf_bytes: bytes,
-    classifications: list[PageClassification] | None = None,
-) -> tuple[list[_TablePage], list[_TablePage]]:
-    """Extract tables from the PDF using page classifications.
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from google.genai import types
 
-    *classifications* is the output of ``classifier.classify_pages()``.
-    Only pages classified as ``course_table_spring`` or
-    ``course_table_fall`` are processed.
 
-    If *classifications* is ``None`` the function falls back to the
-    legacy behaviour of processing **all** pages that contain a table,
-    auto-detecting regular vs intensive from column count.
+class RawTarget(BaseModel):
+    target_code: Optional[str] = Field(None, description="Target code (e.g. 09)")
+    target_name: Optional[str] = Field(None, description="Target name (e.g. 情報)")
+    note: Optional[str] = Field(None, description="Target note (e.g. 23以降入学生対象)")
 
-    Returns ``(regular_pages, intensive_pages)`` where each element is a
-    :class:`_TablePage` carrying the normalised rows, the detected table
-    type and the semester hint.
-    """
-    regular_pages: list[_TablePage] = []
-    intensive_pages: list[_TablePage] = []
 
-    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-        # Determine which pages to process
-        if classifications is not None:
-            page_specs: list[tuple[int, Semester | None]] = []
-            for pc in classifications:
-                if pc.type in ("course_table_spring", "course_table_fall"):
-                    sem = (
-                        Semester.SPRING
-                        if pc.type == "course_table_spring"
-                        else Semester.FALL
-                    )
-                    page_specs.append((pc.page - 1, sem))  # 1-indexed → 0-indexed
-        else:
-            # Legacy fallback: all pages
-            page_specs = [(i, None) for i in range(len(pdf.pages))]
+class RawPairedSlot(BaseModel):
+    day: Optional[str] = Field(None, description="Day of the week")
+    period: Optional[int] = Field(None, description="Period (1-5)")
 
-        for page_idx, semester in page_specs:
-            if page_idx >= len(pdf.pages):
-                logger.warning(
-                    "Page %d not found in PDF (total: %d)",
-                    page_idx + 1,
-                    len(pdf.pages),
+
+class RawCourse(BaseModel):
+    code: str = Field(..., description="Course code (e.g. smab020161)")
+    name: str = Field(..., description="Course name")
+    instructors: List[str] = Field(..., description="Instructors list")
+    year_level: Optional[int] = Field(None, description="Year level")
+    class_section: Optional[str] = Field(None, description="Class section")
+    term: Optional[str] = Field(None, description="Term")
+    day: Optional[str] = Field(None, description="Day")
+    period: Optional[int] = Field(None, description="Period")
+    room: Optional[str] = Field(None, description="Room")
+    target_raw: Optional[str] = Field(None, description="Raw target text")
+    targets: Optional[List[RawTarget]] = Field(None, description="Structured targets")
+    notes: Optional[str] = Field(None, description="Notes")
+    paired_slots: Optional[List[RawPairedSlot]] = Field(
+        None, description="Paired slots"
+    )
+
+
+class TimetableResponse(BaseModel):
+    courses: List[RawCourse] = Field(..., description="List of extracted courses")
+
+
+def _raw_to_extracted_course(
+    raw: dict, semester: Semester | None = None
+) -> ExtractedCourse | None:
+    """Convert a raw dict from Gemini into an ExtractedCourse, or None if invalid."""
+
+    code = str(raw.get("code", "")).strip()
+    if not code or not COURSE_CODE_PATTERN.match(code):
+        logger.debug("Skipping invalid/missing course code: %r", code)
+        return None
+
+    name = str(raw.get("name", "")).strip()
+    instructors: list[str] = [
+        str(i).strip() for i in raw.get("instructors", []) if str(i).strip()
+    ]
+    if not instructors:
+        instructors = ["未定"]
+
+    year_level = int(raw.get("year_level", 1) or 1)
+    class_section = str(raw.get("class_section", "") or "").strip()
+    notes = str(raw.get("notes", "") or "").strip()
+    target_raw = str(raw.get("target_raw", "") or "").strip()
+
+    # Build targets
+    targets: list[CourseTarget] = []
+    for t in raw.get("targets", []) or []:
+        tc = str(t.get("target_code", "")).strip()
+        tn = str(t.get("target_name", "")).strip()
+        if tc or tn:
+            targets.append(
+                CourseTarget(
+                    target_code=tc,
+                    target_name=tn,
+                    note=str(t.get("note", "") or "").strip(),
                 )
-                continue
-
-            page = pdf.pages[page_idx]
-            tables = page.extract_tables(
-                {"vertical_strategy": "text", "horizontal_strategy": "text"}
             )
 
-            if not tables:
-                logger.warning("No tables found on page %d", page_idx + 1)
-                continue
+    # Build schedules
+    schedules: list[Schedule] = []
+    term = str(raw.get("term", "") or "").strip()
+    day = str(raw.get("day", "") or "").strip()
+    room = str(raw.get("room", "") or "").strip()
+    period_raw = raw.get("period")
 
-            # Normalize all cells
-            raw = [
-                [_normalize(cell) for cell in row] for row in tables[0]
-            ]
+    # Derive semester from term if not explicitly provided
+    if not semester and term:
+        if term.startswith("前期") or term.startswith("前集中") or term == "通年":
+            semester = Semester.SPRING
+        elif term.startswith("後期") or term.startswith("後集中"):
+            semester = Semester.FALL
 
-            # Skip header row (first row with column names)
-            if raw and any(
-                h in raw[0] for h in ("曜", "学期", "科目名")
+    if raw.get("paired_slots"):
+        for slot in raw["paired_slots"]:
+            slot_day = str(slot.get("day", "")).strip()
+            slot_period = slot.get("period")
+            if (
+                slot_day in VALID_DAYS
+                and isinstance(slot_period, int)
+                and 1 <= slot_period <= 5
             ):
-                raw = raw[1:]
+                if term in VALID_TERMS:
+                    schedules.append(
+                        Schedule(term=term, day=slot_day, period=slot_period, room=room)
+                    )
+    elif day and period_raw is not None:
+        try:
+            period = int(period_raw)
+            if day in VALID_DAYS and 1 <= period <= 5 and term in VALID_TERMS:
+                schedules.append(Schedule(term=term, day=day, period=period, room=room))
+        except (ValueError, TypeError):
+            pass
 
-            if not raw:
-                continue
-
-            # Detect regular vs intensive from column count
-            col_count = max(len(row) for row in raw) if raw else 0
-            is_intensive = col_count <= _INTENSIVE_COL_COUNT
-
-            tp = _TablePage(rows=raw, is_intensive=is_intensive, semester=semester)
-            if is_intensive:
-                intensive_pages.append(tp)
-            else:
-                regular_pages.append(tp)
-
-    return regular_pages, intensive_pages
+    try:
+        return ExtractedCourse(
+            code=code,
+            name=name,
+            instructors=instructors,
+            year_level=year_level,
+            class_section=class_section,
+            semester=semester,
+            schedules=schedules,
+            target_raw=target_raw,
+            targets=targets,
+            notes=notes,
+        )
+    except Exception as e:
+        logger.warning("Failed to construct ExtractedCourse for %s: %s", code, e)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -218,9 +265,7 @@ def _is_continuation_row(row: list[str], is_intensive: bool) -> bool:
     return False
 
 
-def merge_multiline_rows(
-    rows: list[list[str]], is_intensive: bool
-) -> list[list[str]]:
+def merge_multiline_rows(rows: list[list[str]], is_intensive: bool) -> list[list[str]]:
     """Merge continuation rows into their parent rows.
 
     The PDF wraps long text across multiple rows. Continuation rows have
@@ -262,9 +307,7 @@ def merge_multiline_rows(
 # ---------------------------------------------------------------------------
 
 
-def carry_forward(
-    rows: list[list[str]], is_intensive: bool
-) -> list[list[str]]:
+def carry_forward(rows: list[list[str]], is_intensive: bool) -> list[list[str]]:
     """Fill in empty cells from the previous row (for merged cells).
 
     Carry-forward columns: 曜, 限, 学期, 年クラス (regular) or 学期, 年クラス (intensive).
@@ -291,9 +334,7 @@ def carry_forward(
 # ---------------------------------------------------------------------------
 
 # Pattern: 対象[XX専攻名] or 対象[XX専攻名/note]
-_TARGET_PATTERN = re.compile(
-    r"対象\[(.+?)\]"
-)
+_TARGET_PATTERN = re.compile(r"対象\[(.+?)\]")
 
 
 def _is_note_text(text: str) -> bool:
@@ -339,7 +380,7 @@ def parse_targets(target_raw: str) -> list[CourseTarget]:
         code_match = re.match(r"^(\d+)", part)
         if code_match:
             code = code_match.group(1)
-            name = part[len(code):]
+            name = part[len(code) :]
 
             # If name looks like a note (e.g., "以降入学生対象"), treat the
             # whole part as a note on the previous target, not a new target.
@@ -357,15 +398,19 @@ def parse_targets(target_raw: str) -> list[CourseTarget]:
             note = ""
             if i + 1 < len(parts):
                 next_part = parts[i + 1].strip()
-                if next_part and (not re.match(r"^\d", next_part) or _is_note_text(next_part)):
+                if next_part and (
+                    not re.match(r"^\d", next_part) or _is_note_text(next_part)
+                ):
                     note = next_part
                     i += 1
 
-            targets.append(CourseTarget(
-                target_code=code,
-                target_name=name,
-                note=note,
-            ))
+            targets.append(
+                CourseTarget(
+                    target_code=code,
+                    target_name=name,
+                    note=note,
+                )
+            )
         else:
             # Non-digit start — probably a note for the previous target
             # like "～24入学生対象"
@@ -390,9 +435,7 @@ def parse_targets(target_raw: str) -> list[CourseTarget]:
 _PAIRED_PATTERN = re.compile(r"対開講\((.+?)\)")
 
 
-def parse_paired_slots(
-    notes: str, term: str
-) -> list[Schedule]:
+def parse_paired_slots(notes: str, term: str) -> list[Schedule]:
     """Parse 対開講 from the notes column.
 
     Returns a list of Schedule objects for all paired slots.
@@ -417,7 +460,7 @@ def parse_paired_slots(
                 continue
 
             if day in VALID_DAYS and 1 <= period <= 5:
-                schedules.append(Schedule(term=term, day=day, period=period))
+                schedules.append(Schedule(day=day, period=period))
             else:
                 logger.warning("Invalid paired slot: day=%s period=%d", day, period)
 
@@ -453,10 +496,10 @@ def _parse_instructors(instructor_raw: str) -> list[str]:
     merged: list[str] = []
     for part in parts:
         is_standalone = (
-            " " in part          # Has family/given separator
-            or "・" in part      # Foreign name format (e.g., "M・テイボン")
+            " " in part  # Has family/given separator
+            or "・" in part  # Foreign name format (e.g., "M・テイボン")
             or part in ("未定", "各教員")
-            or not merged        # First entry is always standalone
+            or not merged  # First entry is always standalone
         )
         if is_standalone:
             merged.append(part)
@@ -524,17 +567,9 @@ def parse_regular_row(row: list[str]) -> ExtractedCourse | None:
         try:
             period = int(period_str)
             if day in VALID_DAYS and 1 <= period <= 5:
-                schedules = [Schedule(term=term, day=day, period=period, room=room)]
+                schedules = [Schedule(day=day, period=period)]
         except (ValueError, TypeError):
             pass
-
-    # If paired slots found, assign room to matching slot
-    if schedules and room:
-        # The room belongs to the current day/period slot
-        for s in schedules:
-            if s.day == day and (not period_str or s.period == int(period_str)):
-                s.room = room
-                break
 
     # Parse targets
     targets = parse_targets(target_raw)
@@ -548,6 +583,8 @@ def parse_regular_row(row: list[str]) -> ExtractedCourse | None:
         instructors=instructors,
         year_level=year_level,
         class_section=class_section,
+        term=term,
+        room=room,
         schedules=schedules,
         target_raw=target_raw,
         targets=targets,
@@ -590,7 +627,9 @@ def parse_intensive_row(row: list[str]) -> ExtractedCourse | None:
     instructors = _parse_instructors(instructor_raw)
 
     if term not in VALID_TERMS:
-        logger.warning("Invalid term '%s' for intensive course %s, skipping", term, code)
+        logger.warning(
+            "Invalid term '%s' for intensive course %s, skipping", term, code
+        )
         return None
 
     targets = parse_targets(target_raw)
@@ -602,6 +641,8 @@ def parse_intensive_row(row: list[str]) -> ExtractedCourse | None:
         instructors=instructors,
         year_level=year_level,
         class_section=class_section,
+        term=term,
+        room=room,
         schedules=[],
         target_raw=target_raw,
         targets=targets,
@@ -628,19 +669,12 @@ def deduplicate_courses(
         if course.code in by_code:
             existing = by_code[course.code]
             # Merge schedules (avoid exact duplicates)
-            existing_slots = {
-                (s.term, s.day, s.period) for s in existing.schedules
-            }
+            existing_slots = {(s.day, s.period) for s in existing.schedules}
             for s in course.schedules:
-                key = (s.term, s.day, s.period)
+                key = (s.day, s.period)
                 if key not in existing_slots:
                     existing.schedules.append(s)
                     existing_slots.add(key)
-                else:
-                    # Update room if the existing slot has no room
-                    for es in existing.schedules:
-                        if (es.term, es.day, es.period) == key and not es.room and s.room:
-                            es.room = s.room
         else:
             by_code[course.code] = course
 
@@ -656,62 +690,84 @@ def extract_courses_from_pdf(
     pdf_bytes: bytes,
     classifications: list[PageClassification] | None = None,
 ) -> list[ExtractedCourse]:
-    """Extract all courses from a PDF timetable.
+    """Extract all courses from a PDF timetable using Gemini API directly."""
+    import pypdf
 
-    This is the main entry point for the extraction logic.
+    # 1. Identify pages that contain tables using pdfplumber
+    table_page_indices = []
+    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+        for idx, page in enumerate(pdf.pages):
+            if page.extract_tables():
+                text = page.extract_text() or ""
+                if "講義コード" in text or "科目名" in text:
+                    table_page_indices.append(idx)
 
-    *classifications* comes from ``classifier.classify_pages()``.  When
-    provided, only classified course-table pages are processed and each
-    extracted course receives the appropriate ``semester`` value.
-
-    When *classifications* is ``None`` the legacy behaviour is used
-    (all pages, no semester tagging).
-    """
-    regular_pages, intensive_pages = extract_tables_from_pdf(
-        pdf_bytes, classifications
-    )
-
-    all_courses: list[ExtractedCourse] = []
-    errors: list[str] = []
-
-    # Process regular tables
-    for tp in regular_pages:
-        merged = merge_multiline_rows(tp.rows, is_intensive=False)
-        filled = carry_forward(merged, is_intensive=False)
-        for row in filled:
-            try:
-                course = parse_regular_row(row)
-                if course:
-                    course.semester = tp.semester
-                    all_courses.append(course)
-            except Exception as e:
-                errors.append(f"Regular row parse error: {e} — row={row}")
-                logger.warning("Failed to parse regular row: %s", e)
-
-    # Process intensive tables
-    for tp in intensive_pages:
-        merged = merge_multiline_rows(tp.rows, is_intensive=True)
-        filled = carry_forward(merged, is_intensive=True)
-        for row in filled:
-            try:
-                course = parse_intensive_row(row)
-                if course:
-                    course.semester = tp.semester
-                    all_courses.append(course)
-            except Exception as e:
-                errors.append(f"Intensive row parse error: {e} — row={row}")
-                logger.warning("Failed to parse intensive row: %s", e)
-
-    # Deduplicate (same course code from multiple 対開講 rows)
-    deduped = deduplicate_courses(all_courses)
+    if not table_page_indices:
+        logger.warning("No table pages detected via pdfplumber; returning empty.")
+        return []
 
     logger.info(
-        "Extracted %d courses (%d before dedup, %d errors)",
-        len(deduped),
-        len(all_courses),
-        len(errors),
+        "Found %d table pages to process page-by-page.", len(table_page_indices)
     )
 
+    client = genai.Client(api_key=Config.GEMINI_API_KEY)
+    reader = pypdf.PdfReader(BytesIO(pdf_bytes))
+    all_courses: list[ExtractedCourse] = []
+
+    prompt = f"""以下は東京都市大学 総合理工学研究科の授業時間表 PDF の1ページです。
+全ての行を構造化 JSON（TimetableResponse）として出力してください。
+
+ルール:
+- 結合セル（曜日・時限・学期・年クラスが空欄）は直前の行の値を引き継いでください
+- 「対開講(月1,木1)」のような記述がある場合は paired_slots に全スロットをリストアップしてください
+- 受講対象は target_raw に原文を、targets に構造化した情報を入れてください
+- instructors が複数の場合は配列に分けてください
+- 集中講義は day, period が空になります（paired_slots も空）
+- 講義コードが無効な行はスキップしてください（形式: sm[英字2][数字6]、例: smab020161）
+"""
+
+    for idx in table_page_indices:
+        logger.info("Processing page %d with Gemini...", idx + 1)
+        writer = pypdf.PdfWriter()
+        writer.add_page(reader.pages[idx])
+
+        single_page_pdf = BytesIO()
+        writer.write(single_page_pdf)
+        single_page_bytes = single_page_pdf.getvalue()
+
+        try:
+            response = client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=[
+                    types.Part.from_bytes(
+                        data=single_page_bytes, mime_type="application/pdf"
+                    ),
+                    prompt,
+                ],
+                config=genai.types.GenerateContentConfig(
+                    temperature=0.0,
+                    max_output_tokens=65536,
+                    thinking_config=types.ThinkingConfig(thinking_level="LOW"),
+                    response_mime_type="application/json",
+                    response_json_schema=TimetableResponse.model_json_schema(),
+                ),
+            )
+
+            if not response.text:
+                logger.warning(
+                    "Gemini response for page %d did not include text.", idx + 1
+                )
+                continue
+
+            parsed = TimetableResponse.model_validate_json(response.text)
+            for c in parsed.courses:
+                course = _raw_to_extracted_course(c.model_dump())
+                if course:
+                    all_courses.append(course)
+        except Exception as e:
+            logger.error("Failed processing page %d: %s", idx + 1, e)
+
+    deduped = deduplicate_courses(all_courses)
     return deduped
 
 
@@ -740,7 +796,6 @@ def compute_hash(data: bytes) -> str:
 def main() -> None:
     """Run extraction for all pending extractions in the database."""
     from pipeline import db
-    from pipeline.classifier import classify_pages
 
     Config.validate()
 
@@ -757,9 +812,8 @@ def main() -> None:
         try:
             pdf_bytes = download_pdf(pdf_url)
 
-            # Classify pages with Gemini
-            classifications = classify_pages(pdf_bytes)
-            courses = extract_courses_from_pdf(pdf_bytes, classifications)
+            # Extract directly without classification
+            courses = extract_courses_from_pdf(pdf_bytes)
 
             # Determine academic year from URL or default to current year
             academic_year = _detect_academic_year(pdf_url)

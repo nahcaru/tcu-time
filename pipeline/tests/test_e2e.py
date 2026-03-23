@@ -25,7 +25,6 @@ from ..monitor import (
 )
 from ..extractor import (
     extract_courses_from_pdf,
-    extract_tables_from_pdf,
 )
 from ..enricher import (
     enrich_courses,

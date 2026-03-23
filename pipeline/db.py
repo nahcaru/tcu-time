@@ -142,6 +142,8 @@ def upsert_courses(
             "year_level": course.get("year_level", 1),
             "class_section": course.get("class_section", ""),
             "academic_year": academic_year,
+            "term": course.get("term", ""),
+            "room": course.get("room", ""),
             "notes": course.get("notes", ""),
             "source_type": source_type,
             "is_tentative": is_tentative,
@@ -151,7 +153,7 @@ def upsert_courses(
 
         result = (
             client.table("courses")
-            .upsert(course_row, on_conflict="code")
+            .upsert(course_row, on_conflict="code, academic_year")
             .execute()
         )
         row = cast(Row, result.data[0])
@@ -167,10 +169,8 @@ def upsert_courses(
             schedule_rows = [
                 {
                     "course_id": course_id,
-                    "term": s["term"],
                     "day": s["day"],
                     "period": s["period"],
-                    "room": s.get("room", ""),
                 }
                 for s in schedules
             ]
@@ -473,3 +473,195 @@ def set_advance_enrollment(course_id: str) -> Row:
         .execute()
     )
     return cast(Row, result.data[0])
+
+
+# ---------------------------------------------------------------------------
+# Admin approval workflow
+# ---------------------------------------------------------------------------
+
+
+def get_extractions_for_review(
+    *,
+    status: str = "extracted",
+    limit: int = 50,
+) -> list[Row]:
+    """Get extraction records awaiting admin review.
+
+    Defaults to status='extracted' (ready for approval).
+    Returns records ordered by creation date ascending.
+    """
+    result = (
+        get_client()
+        .table("extractions")
+        .select("id, pdf_url, pdf_type, semester, is_tentative, academic_year, status, created_at, updated_at")
+        .eq("status", status)
+        .order("created_at")
+        .limit(limit)
+        .execute()
+    )
+    return cast(list[Row], result.data)
+
+
+def get_extraction_detail(extraction_id: str) -> Row | None:
+    """Get full extraction record including raw_json for the review UI."""
+    result = (
+        get_client()
+        .table("extractions")
+        .select("*")
+        .eq("id", extraction_id)
+        .single()
+        .execute()
+    )
+    if not result.data:
+        return None
+    return cast(Row, result.data)
+
+
+def _apply_timetable_approval(extraction: Row) -> int:
+    """Reflect timetable raw_json into the courses table. Returns course count."""
+    raw = extraction.get("raw_json") or {}
+    courses_data: list[dict[str, Any]] = raw.get("courses", [])
+    if not courses_data:
+        return 0
+
+    semester = raw.get("semester")
+    is_tentative: bool = bool(raw.get("is_tentative", False))
+    academic_year: int | None = raw.get("academic_year")
+
+    # If this is a confirmed fall timetable, delete existing tentative fall courses first.
+    if semester == "fall" and not is_tentative and academic_year is not None:
+        deleted = delete_courses(academic_year=academic_year, is_tentative=True)
+        if deleted:
+            logger.info("Deleted %d tentative fall courses before reflecting approved data", deleted)
+
+    upserted = upsert_courses(
+        courses_data,
+        extraction_id=extraction["id"],
+        academic_year=academic_year,
+        source_type="timetable",
+        is_tentative=is_tentative,
+        semester=semester,
+    )
+    return len(upserted)
+
+
+def _apply_changelog_approval(extraction: Row) -> int:
+    """Reflect changelog raw_json into the courses table. Returns change count."""
+    raw = extraction.get("raw_json") or {}
+    changes_data: list[dict[str, Any]] = raw.get("changes", [])
+    if not changes_data:
+        return 0
+
+    semester = raw.get("semester", "spring")
+    academic_year: int | None = raw.get("academic_year")
+
+    # Reconstruct ChangeEntry objects and apply
+    from pipeline.models import ChangeEntry
+
+    changes = [ChangeEntry.model_validate(c) for c in changes_data]
+
+    for change in changes:
+        if change.change_type == "create":
+            # build minimal course payload and upsert
+            if not change.course_name:
+                continue
+            course_row: dict[str, Any] = {
+                "code": change.course_code or "",
+                "name": change.course_name,
+                "instructors": ["未定"],
+                "source_type": "changelog",
+                "notes": "",
+                "schedules": [],
+                "targets": [],
+            }
+            if change.course_code:
+                upsert_courses(
+                    [course_row],
+                    extraction_id=extraction["id"],
+                    academic_year=academic_year,
+                    source_type="changelog",
+                )
+
+        elif change.change_type == "update":
+            course = find_course(
+                code=change.course_code,
+                name=change.course_name,
+                term=change.term,
+                day=change.day,
+                period=change.period,
+            )
+            if not course:
+                logger.warning("modify: course not found: %s / %s", change.course_code, change.course_name)
+                continue
+            field_changes = [c.model_dump() for c in change.changes]
+            update_course_fields(course["id"], field_changes)
+
+        elif change.change_type == "delete":
+            course = find_course(
+                code=change.course_code,
+                name=change.course_name,
+                term=change.term,
+                day=change.day,
+                period=change.period,
+            )
+            if not course:
+                logger.warning("delete: course not found: %s / %s", change.course_code, change.course_name)
+                continue
+            mark_cancelled(course["id"])
+
+    return len(changes)
+
+
+def _apply_advance_approval(extraction: Row) -> int:
+    """Reflect advance enrollment raw_json into the courses table. Returns flag count."""
+    raw = extraction.get("raw_json") or {}
+    names: list[str] = raw.get("names", [])
+    if not names:
+        return 0
+
+    academic_year: int | None = raw.get("academic_year")
+    if academic_year is None:
+        from datetime import date
+        today = date.today()
+        academic_year = today.year if today.month >= 4 else today.year - 1
+
+    reset_advance_enrollment(academic_year)
+
+    count = 0
+    for name in names:
+        matched = find_courses_by_name(name, academic_year)
+        for course in matched:
+            set_advance_enrollment(course["id"])
+            count += 1
+
+    return count
+
+
+def approve_extraction(extraction_id: str) -> int:
+    """Approve an extraction: reflect raw_json into the courses table.
+
+    Dispatches to the appropriate sub-handler based on pdf_type.
+    Updates status to 'approved' and returns the number of records affected.
+    """
+    extraction = get_extraction_detail(extraction_id)
+    if extraction is None:
+        raise ValueError(f"Extraction not found: {extraction_id}")
+
+    pdf_type: str = extraction.get("pdf_type", "timetable")
+
+    try:
+        if pdf_type == "timetable":
+            count = _apply_timetable_approval(extraction)
+        elif pdf_type == "changelog":
+            count = _apply_changelog_approval(extraction)
+        elif pdf_type == "advance_enrollment":
+            count = _apply_advance_approval(extraction)
+        else:
+            raise ValueError(f"Unknown pdf_type: {pdf_type}")
+    except Exception:
+        logger.error("Approval failed for extraction %s", extraction_id, exc_info=True)
+        raise
+
+    update_extraction_status(extraction_id, "approved")
+    logger.info("Approved extraction %s (%s): %d records affected", extraction_id, pdf_type, count)
+    return count

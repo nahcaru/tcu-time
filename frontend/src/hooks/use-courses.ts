@@ -89,7 +89,7 @@ export function useCourses(filters?: CourseFilters) {
   if (filters?.terms && filters.terms.length > 0) {
     const termSet = new Set(filters.terms)
     courses = courses.filter((c) =>
-      c.schedules.some((s) => termSet.has(s.term))
+      c.term != null && termSet.has(c.term)
     )
   }
 
@@ -103,8 +103,9 @@ export function useCourses(filters?: CourseFilters) {
     const enrolledCourses = allCourses.filter(c => filters.enrolledCourseIds!.has(c.id))
     const occupiedSlots = new Set<string>()
     for (const ec of enrolledCourses) {
+      if (!ec.term) continue
+      const overlappingTerms = getOverlappingTerms(ec.term)
       for (const s of ec.schedules) {
-        const overlappingTerms = getOverlappingTerms(s.term)
         for (const t of overlappingTerms) {
           occupiedSlots.add(`${t}-${s.day}-${s.period}`)
         }
@@ -114,8 +115,9 @@ export function useCourses(filters?: CourseFilters) {
     courses = courses.filter((c) => {
       // Hide already enrolled courses
       if (filters.enrolledCourseIds!.has(c.id)) return false
+      if (!c.term) return true
       // Keep courses that DO NOT share any slot with occupiedSlots
-      return !c.schedules.some((s) => occupiedSlots.has(`${s.term}-${s.day}-${s.period}`))
+      return !c.schedules.some((s) => occupiedSlots.has(`${c.term}-${s.day}-${s.period}`))
     })
   }
 

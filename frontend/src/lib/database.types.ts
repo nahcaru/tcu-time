@@ -83,8 +83,10 @@ export type Database = {
           is_tentative: boolean | null
           name: string
           notes: string | null
+          room: string | null
           source_type: string | null
           status: string | null
+          term: string | null
           updated_at: string | null
           year_level: number | null
         }
@@ -100,8 +102,10 @@ export type Database = {
           is_tentative?: boolean | null
           name: string
           notes?: string | null
+          room?: string | null
           source_type?: string | null
           status?: string | null
+          term?: string | null
           updated_at?: string | null
           year_level?: number | null
         }
@@ -117,8 +121,10 @@ export type Database = {
           is_tentative?: boolean | null
           name?: string
           notes?: string | null
+          room?: string | null
           source_type?: string | null
           status?: string | null
+          term?: string | null
           updated_at?: string | null
           year_level?: number | null
         }
@@ -134,35 +140,47 @@ export type Database = {
       }
       extractions: {
         Row: {
+          academic_year: number | null
           created_at: string | null
           error_log: string | null
           id: string
+          is_tentative: boolean | null
           pdf_hash: string
+          pdf_type: string | null
           pdf_url: string
           raw_json: Json | null
           reviewed_by: string | null
+          semester: string | null
           status: string | null
           updated_at: string | null
         }
         Insert: {
+          academic_year?: number | null
           created_at?: string | null
           error_log?: string | null
           id?: string
+          is_tentative?: boolean | null
           pdf_hash: string
+          pdf_type?: string | null
           pdf_url: string
           raw_json?: Json | null
           reviewed_by?: string | null
+          semester?: string | null
           status?: string | null
           updated_at?: string | null
         }
         Update: {
+          academic_year?: number | null
           created_at?: string | null
           error_log?: string | null
           id?: string
+          is_tentative?: boolean | null
           pdf_hash?: string
+          pdf_type?: string | null
           pdf_url?: string
           raw_json?: Json | null
           reviewed_by?: string | null
+          semester?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -198,24 +216,18 @@ export type Database = {
           day: string
           id: string
           period: number
-          room: string | null
-          term: string
         }
         Insert: {
           course_id: string
           day: string
           id?: string
           period: number
-          room?: string | null
-          term: string
         }
         Update: {
           course_id?: string
           day?: string
           id?: string
           period?: number
-          room?: string | null
-          term?: string
         }
         Relationships: [
           {
@@ -313,6 +325,7 @@ export type CourseMetadata = Tables<"course_metadata">
 export type UserEnrollment = Tables<"user_enrollments">
 export type UserSettings = Tables<"user_settings">
 export type Extraction = Tables<"extractions">
+export type ExtractionRow = Extraction
 
 /** Course with all joined relations */
 export interface CourseWithRelations extends Course {

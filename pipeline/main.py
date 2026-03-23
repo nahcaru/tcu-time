@@ -1,6 +1,10 @@
 """Pipeline orchestrator — wires monitor, classifier, extractor, changelog,
 advance enrollment, and enricher into a single ``run_pipeline()`` entry point.
 
+Design change: all handlers now save results as raw_json in the extractions
+table (status='extracted') instead of writing directly to the courses table.
+DB reflection happens only after admin approval via db.approve_extraction().
+
 Intended to be invoked by GitHub Actions via::
 
     python -m pipeline.main
@@ -40,7 +44,7 @@ def _detect_academic_year(pdf_url: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Per-PDF dispatch
+# Per-PDF handlers — extract only, save raw_json, await admin approval
 # ---------------------------------------------------------------------------
 
 
@@ -52,43 +56,42 @@ def _handle_timetable(
     is_tentative: bool,
     academic_year: int,
 ) -> int:
-    """Process a timetable PDF: classify → extract → upsert courses.
+    """Process a timetable PDF: classify → extract → save raw_json.
 
-    Returns the number of courses upserted.
+    Does NOT write to the courses table. Returns the number of courses extracted.
+    DB reflection happens after admin approval via db.approve_extraction().
     """
-    from pipeline.classifier import classify_pages
     from pipeline.extractor import extract_courses_from_pdf
+    courses = extract_courses_from_pdf(pdf_bytes)
 
-    classifications = classify_pages(pdf_bytes)
-    courses = extract_courses_from_pdf(pdf_bytes, classifications)
 
     if not courses:
         logger.warning("No courses extracted from %s", pdf_url)
-        db.update_extraction_status(extraction_id, "extracted", raw_json={"courses": [], "count": 0})
+        db.update_extraction_status(
+            extraction_id,
+            "extracted",
+            raw_json={"courses": [], "count": 0},
+        )
         return 0
-
-    # When a confirmed fall PDF arrives, delete tentative fall data first.
-    if not is_tentative and semester_str == Semester.FALL.value:
-        deleted = db.delete_courses(academic_year=academic_year, is_tentative=True)
-        if deleted:
-            logger.info("Deleted %d tentative fall courses before inserting confirmed data", deleted)
 
     courses_data = [c.model_dump() for c in courses]
 
-    db.upsert_courses(
-        courses_data,
-        extraction_id=extraction_id,
-        academic_year=academic_year,
-        source_type="timetable",
-        is_tentative=is_tentative,
-        semester=semester_str,
-    )
     db.update_extraction_status(
         extraction_id,
         "extracted",
-        raw_json={"courses": courses_data, "count": len(courses)},
+        raw_json={
+            "courses": courses_data,
+            "count": len(courses),
+            "semester": semester_str,
+            "is_tentative": is_tentative,
+            "academic_year": academic_year,
+        },
     )
-    logger.info("Timetable extraction complete: %d courses from %s", len(courses), pdf_url)
+    logger.info(
+        "Timetable extracted: %d courses from %s — awaiting admin approval",
+        len(courses),
+        pdf_url,
+    )
     return len(courses)
 
 
@@ -99,26 +102,38 @@ def _handle_changelog(
     semester_str: str | None,
     academic_year: int,
 ) -> None:
-    """Process a changelog PDF: parse → apply diffs."""
-    from pipeline.changelog import apply_changelog, parse_changelog
+    """Process a changelog PDF: parse → save raw_json.
+
+    Does NOT apply changes to the DB. Returns after saving raw_json.
+    DB reflection happens after admin approval via db.approve_extraction().
+    """
+    from pipeline.changelog import parse_changelog
 
     changes = parse_changelog(pdf_bytes)
     if not changes:
         logger.info("No changelog entries found in %s", pdf_url)
-        db.update_extraction_status(extraction_id, "extracted", raw_json={"changes": [], "count": 0})
+        db.update_extraction_status(
+            extraction_id,
+            "extracted",
+            raw_json={"changes": [], "count": 0},
+        )
         return
 
-    apply_changelog(
-        changes,
-        semester=semester_str or Semester.SPRING.value,
-        academic_year=academic_year,
-    )
     db.update_extraction_status(
         extraction_id,
         "extracted",
-        raw_json={"changes": [c.model_dump() for c in changes], "count": len(changes)},
+        raw_json={
+            "changes": [c.model_dump() for c in changes],
+            "count": len(changes),
+            "semester": semester_str or Semester.SPRING.value,
+            "academic_year": academic_year,
+        },
     )
-    logger.info("Changelog applied: %d entries from %s", len(changes), pdf_url)
+    logger.info(
+        "Changelog extracted: %d entries from %s — awaiting admin approval",
+        len(changes),
+        pdf_url,
+    )
 
 
 def _handle_advance_enrollment(
@@ -127,41 +142,37 @@ def _handle_advance_enrollment(
     extraction_id: str,
     academic_year: int,
 ) -> None:
-    """Process an advance enrollment PDF: extract names → update flags."""
-    from pipeline.advance import extract_course_names, update_flags
+    """Process an advance enrollment PDF: extract names → save raw_json.
+
+    Does NOT update advance_enrollment flags in the DB.
+    DB reflection happens after admin approval via db.approve_extraction().
+    """
+    from pipeline.advance import extract_course_names
 
     course_names = extract_course_names(pdf_bytes)
     if not course_names:
         logger.info("No course names extracted from advance enrollment PDF %s", pdf_url)
-        db.update_extraction_status(extraction_id, "extracted", raw_json={"names": [], "count": 0})
+        db.update_extraction_status(
+            extraction_id,
+            "extracted",
+            raw_json={"names": [], "count": 0},
+        )
         return
 
-    update_flags(course_names, academic_year)
     db.update_extraction_status(
         extraction_id,
         "extracted",
-        raw_json={"names": course_names, "count": len(course_names)},
+        raw_json={
+            "names": course_names,
+            "count": len(course_names),
+            "academic_year": academic_year,
+        },
     )
-    logger.info("Advance enrollment flags updated: %d names from %s", len(course_names), pdf_url)
-
-
-# ---------------------------------------------------------------------------
-# Enrichment
-# ---------------------------------------------------------------------------
-
-
-def _run_enrichment(academic_year: int) -> None:
-    """Run syllabus enrichment for courses missing metadata."""
-    from pipeline.enricher import enrich_courses
-
-    courses = db.get_courses_needing_enrichment()
-    if not courses:
-        logger.info("No courses need enrichment")
-        return
-
-    logger.info("Enriching %d courses for academic year %d", len(courses), academic_year)
-    success, failure = enrich_courses(courses, academic_year)
-    logger.info("Enrichment complete: %d succeeded, %d failed", success, failure)
+    logger.info(
+        "Advance enrollment extracted: %d names from %s — awaiting admin approval",
+        len(course_names),
+        pdf_url,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -199,12 +210,11 @@ def _process_extraction(
     if academic_year_ref[0] is None:
         academic_year_ref[0] = year
 
-    # Determine tentative flag.
     is_tentative = False
 
     try:
         if pdf_type_str == PDFType.TIMETABLE.value:
-            _ = _handle_timetable(
+            _handle_timetable(
                 pdf_bytes,
                 pdf_url,
                 extraction_id,
@@ -244,7 +254,12 @@ def _process_extraction(
 
 
 def run_pipeline() -> None:
-    """Execute the full pipeline: monitor → classify → extract/diff → enrich."""
+    """Execute the pipeline: monitor → classify → extract → save raw_json.
+
+    Does NOT write directly to the courses table. All extracted data is
+    saved as raw_json in the extractions table with status='extracted'.
+    Admin approval via the admin UI triggers DB reflection.
+    """
     from pipeline.monitor import check_for_updates, compute_hash, download_pdf
 
     Config.validate()
@@ -259,7 +274,6 @@ def run_pipeline() -> None:
         logger.info("Processing %d new/changed PDF(s)", len(new_pdfs))
         for pdf_info in new_pdfs:
             pdf_url: str = pdf_info["url"]
-            # Download to match extraction record by URL + hash.
             try:
                 pdf_bytes = download_pdf(pdf_url)
             except Exception:
@@ -294,11 +308,7 @@ def run_pipeline() -> None:
         logger.info("No updates detected — pipeline finished.")
         return
 
-    # Step 2: Enrichment
-    if academic_year_ref[0] is not None:
-        _run_enrichment(academic_year_ref[0])
-
-    logger.info("Pipeline run complete.")
+    logger.info("Pipeline run complete. Extracted data awaiting admin approval.")
 
 
 # ---------------------------------------------------------------------------
