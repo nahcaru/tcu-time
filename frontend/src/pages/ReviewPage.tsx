@@ -15,6 +15,8 @@ import {
   type AdvanceRawJson,
   type ExtractionRawJson,
 } from "@/lib/approvalService"
+import { PageHeader } from "@/components/layout/PageHeader"
+import { IconChevronDown, IconChevronUp } from "@tabler/icons-react"
 
 // =============================================================================
 // Constants
@@ -117,6 +119,64 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
 function CheckboxRow({
   checked,
   onChange,
+  title,
+  description,
+  children,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  title?: string
+  description?: string
+  children: React.ReactNode
+}) {
+  const [isOpen, setIsOpen] = useState(!checked)
+  const [prevChecked, setPrevChecked] = useState(checked)
+
+  if (checked !== prevChecked) {
+    setPrevChecked(checked)
+    setIsOpen(!checked)
+  }
+
+  return (
+    <div className="flex gap-3 items-start transition-all">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-3.5 h-4 w-4 shrink-0 accent-primary cursor-pointer"
+      />
+      <div className="flex-1 min-w-0 rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
+        {/* Toggle header */}
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center justify-between w-full p-3 text-left hover:bg-muted/50 transition-colors"
+        >
+          <div className="flex flex-col gap-0.5 pr-2">
+            <span className="text-sm font-semibold">{title || "詳細情報"}</span>
+            {description && <span className="text-xs text-muted-foreground truncate">{description}</span>}
+          </div>
+          {isOpen ? (
+            <IconChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+          ) : (
+            <IconChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          )}
+        </button>
+
+        {/* Content */}
+        {isOpen && (
+          <div className="p-3 border-t bg-background/50">
+            {children}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SimpleCheckboxRow({
+  checked,
+  onChange,
   children,
 }: {
   checked: boolean
@@ -124,12 +184,12 @@ function CheckboxRow({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex gap-3 items-start">
+    <div className="flex gap-2 items-center">
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-3 h-4 w-4 shrink-0 accent-primary cursor-pointer"
+        className="h-4 w-4 shrink-0 accent-primary cursor-pointer"
       />
       <div className="flex-1 min-w-0">{children}</div>
     </div>
@@ -178,10 +238,15 @@ function TimetableEditor({
   return (
     <div className="space-y-4">
       {courses.map((c, i) => (
-        <CheckboxRow key={i} checked={checkedSet.has(i)} onChange={(v) => onToggleCheck(i, v)}>
-          <div className="rounded-lg border p-3 space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-xs font-medium text-muted-foreground">#{i + 1}</span>
+        <CheckboxRow
+          key={i}
+          checked={checkedSet.has(i)}
+          onChange={(v) => onToggleCheck(i, v)}
+          title={`#${i + 1} ${c.name || "（科目名なし）"}`}
+          description={[c.code, c.term, c.room].filter(Boolean).join(" / ")}
+        >
+          <div className="space-y-3 relative">
+            <div className="absolute right-0 -top-1">
               <RemoveButton onClick={() => removeCourse(i)} />
             </div>
 
@@ -358,9 +423,19 @@ function ChangelogEditor({
   return (
     <div className="space-y-3">
       {changes.map((c, i) => (
-        <CheckboxRow key={i} checked={checkedSet.has(i)} onChange={(v) => onToggleCheck(i, v)}>
-          <div className="rounded-lg border p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
+        <CheckboxRow
+          key={i}
+          checked={checkedSet.has(i)}
+          onChange={(v) => onToggleCheck(i, v)}
+          title={`#${i + 1} ${CHANGE_TYPE_LABEL[c.change_type] || "変更"} - ${c.course_name || "（科目名なし）"}`}
+          description={[c.course_code, c.term, c.day, c.period ? `${c.period}限` : ""].filter(Boolean).join(" / ")}
+        >
+          <div className="space-y-2 relative">
+            <div className="absolute right-0 -top-1">
+              <RemoveButton onClick={() => removeChange(i)} />
+            </div>
+
+            <div className="pr-12 w-1/2 min-w-[120px]">
               <SelectField
                 label="タイプ"
                 value={c.change_type}
@@ -368,7 +443,6 @@ function ChangelogEditor({
                 optionLabels={CHANGE_TYPE_LABEL}
                 onChange={(v) => updateChange(i, { change_type: v as RawChange["change_type"] })}
               />
-              <RemoveButton onClick={() => removeChange(i)} />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -470,16 +544,21 @@ function AdvanceEditor({
   return (
     <div className="space-y-1.5">
       {names.map((name, i) => (
-        <CheckboxRow key={i} checked={checkedSet.has(i)} onChange={(v) => onToggleCheck(i, v)}>
+        <SimpleCheckboxRow
+          key={i}
+          checked={checkedSet.has(i)}
+          onChange={(v) => onToggleCheck(i, v)}
+        >
           <div className="flex items-center gap-2">
             <input
               className="flex-1 text-sm border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
               value={name}
+              placeholder="科目名を入力"
               onChange={(e) => updateName(i, e.target.value)}
             />
             <RemoveButton onClick={() => removeName(i)} />
           </div>
-        </CheckboxRow>
+        </SimpleCheckboxRow>
       ))}
       <AddRowButton onClick={addName} />
     </div>
@@ -593,8 +672,12 @@ export function ReviewPage() {
   const badge = STATUS_LABELS[status] ?? { label: status, color: "bg-muted text-muted-foreground" }
   const isReviewable = status === "extracted"
 
+  const title = `${PDF_TYPE_LABELS[pdfType] ?? pdfType}${
+    extraction.semester === "spring" ? "（前期）" : extraction.semester === "fall" ? "（後期）" : ""
+  }${extraction.academic_year ? ` ${extraction.academic_year}年度` : ""}`
+
   return (
-    <div className="flex flex-col gap-4 h-[calc(100vh-64px)] overflow-hidden">
+    <div className="relative flex min-h-full flex-col lg:h-full lg:overflow-hidden">
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background text-sm px-4 py-2 rounded-lg shadow-lg">
@@ -602,58 +685,56 @@ export function ReviewPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-start justify-between shrink-0 pt-6">
-        <div className="space-y-1">
+      <PageHeader title={title}>
+        <div className="flex w-full items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
+              {badge.label}
+            </span>
+            <span className="hidden sm:inline-block truncate max-w-[150px] md:max-w-md" title={extraction.pdf_url}>
+              {extraction.pdf_url.split("/").slice(-2).join("/")}
+            </span>
+          </div>
+
+          {/* Approve button */}
+          {isReviewable && (
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="text-xs text-muted-foreground hover:text-foreground hidden md:block"
+              >
+                {allChecked ? "全選択解除" : "全選択"}
+              </button>
+              <span className="text-xs text-muted-foreground hidden sm:block">
+                {checkedSet.size}/{itemCount}
+              </span>
+              <button
+                onClick={handleApprove}
+                disabled={acting || !allChecked}
+                className="h-8 md:h-9 px-3 md:px-4 rounded-md bg-primary text-primary-foreground text-xs md:text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                title={allChecked ? "" : "すべての項目にチェックを入れてください"}
+              >
+                {acting ? "処理中…" : "承認して反映"}
+              </button>
+            </div>
+          )}
+        </div>
+      </PageHeader>
+
+      <div className="flex min-h-0 flex-1 flex-col px-2 py-4 pt-14 md:px-6 md:pt-4">
+        <div className="mb-4 shrink-0 px-2 md:px-0">
           <button
             onClick={() => navigate("/admin")}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             ← 一覧へ戻る
           </button>
-          <h1 className="text-xl font-semibold">
-            {PDF_TYPE_LABELS[pdfType] ?? pdfType}
-            {extraction.semester === "spring" ? "（前期）" : extraction.semester === "fall" ? "（後期）" : ""}
-            {extraction.academic_year ? ` ${extraction.academic_year}年度` : ""}
-          </h1>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
-              {badge.label}
-            </span>
-            <span className="truncate max-w-md" title={extraction.pdf_url}>
-              {extraction.pdf_url.split("/").slice(-2).join("/")}
-            </span>
-          </div>
         </div>
 
-        {/* Approve button */}
-        {isReviewable && (
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={toggleAll}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              {allChecked ? "全選択解除" : "全選択"}
-            </button>
-            <span className="text-xs text-muted-foreground">
-              {checkedSet.size}/{itemCount}
-            </span>
-            <button
-              onClick={handleApprove}
-              disabled={acting || !allChecked}
-              className="h-10 px-6 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-              title={allChecked ? "" : "すべての項目にチェックを入れてください"}
-            >
-              {acting ? "処理中…" : "承認して反映"}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Main split layout */}
-      <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
-        {/* Left: PDF viewer */}
+        {/* Main split layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
+          {/* Left: PDF viewer */}
         <div className="flex flex-col rounded-xl border overflow-hidden">
           <div className="px-4 py-2 bg-muted/40 text-xs font-medium text-muted-foreground border-b shrink-0">
             PDF ビュー
@@ -702,14 +783,15 @@ export function ReviewPage() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Already processed */}
-      {!isReviewable && (
-        <div className="pb-4 text-sm text-muted-foreground shrink-0">
-          このタスクはすでに処理済みです（{badge.label}）。
         </div>
-      )}
+
+        {/* Already processed */}
+        {!isReviewable && (
+          <div className="pt-4 text-sm text-muted-foreground shrink-0 px-2 md:px-0 pb-6 lg:pb-0">
+            このタスクはすでに処理済みです（{badge.label}）。
+          </div>
+        )}
+      </div>
     </div>
   )
 }
