@@ -80,7 +80,8 @@ shadcn/ui `Sidebar` コンポーネント使用:
 | `/timetable` | 時間割       | ログイン推奨 | 月〜土 × 5 時限グリッド + 単位トラッカー |
 | `/login`     | ログイン     | 不要         | Supabase Auth UI                         |
 | `/profile`   | プロフィール | 要ログイン   | アカウント管理・ログアウト               |
-| `/admin`     | 管理画面     | 要管理者     | 抽出ステータス一覧・承認 UI              |
+| `/admin`     | 管理画面     | 要管理者     | 抽出ステータス一覧・管理                 |
+| `/admin/review/:id` | データ審査 | 要管理者 | PDF と JSON の並列比較修正、承認 |
 
 ---
 
@@ -384,8 +385,7 @@ frontend/
 │   │   │   ├── LoginForm.tsx
 │   │   │   └── ProfileView.tsx
 │   │   └── admin/
-│   │       ├── ExtractionList.tsx # 抽出一覧
-│   │       └── ReviewPanel.tsx    # 承認 UI
+│   │       └── ExtractionList.tsx # 抽出一覧 (ステータス順)
 │   ├── hooks/
 │   │   ├── use-courses.ts         # 科目データ取得
 │   │   ├── use-enrollments.ts     # 登録科目 CRUD
@@ -401,6 +401,7 @@ frontend/
 │       ├── TimetablePage.tsx
 │       ├── LoginPage.tsx
 │       ├── ProfilePage.tsx
-│       └── AdminPage.tsx
+│       ├── AdminPage.tsx
+│       └── ReviewPage.tsx         # 審査画面 (PDFプレビュー, インライン編集, 承認)
 └── public/
 ```

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { IconLogout, IconTrash } from "@tabler/icons-react"
+import { IconLogout, IconTrash, IconSettings } from "@tabler/icons-react"
+import { useNavigate } from "react-router"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,10 +29,16 @@ interface ProfileDialogProps {
 
 export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const { user, signOut } = useAuth()
+  const navigate = useNavigate()
 
   const handleSignOut = async () => {
     await signOut()
     onOpenChange(false) // Close modal on signout
+  }
+
+  const handleAdminNavigate = () => {
+    onOpenChange(false)
+    navigate("/admin")
   }
 
   const displayName =
@@ -41,6 +48,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
     "ユーザー"
 
   const avatarUrl = user?.user_metadata?.avatar_url
+  const isAdmin = user?.app_metadata?.role === "admin"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -67,8 +75,19 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
             </div>
           </div>
 
-          {/* ログアウトアクション */}
-          <div className="flex justify-start">
+          {/* ログアウト・管理画面アクション */}
+          <div className="flex justify-start gap-3">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 text-sm"
+                onClick={handleAdminNavigate}
+              >
+                <IconSettings className="h-4 w-4" />
+                管理画面
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

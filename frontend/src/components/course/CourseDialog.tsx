@@ -30,11 +30,9 @@ export function CourseDialog({
   const scheduleText = course.schedules
     .map((s) => `${s.day}${s.period}`)
     .join("・")
-  const termText = [...new Set(course.schedules.map((s) => s.term))].join(", ")
+  const termText = course.term ?? ""
 
-  const rooms = [
-    ...new Set(course.schedules.map((s) => s.room).filter(Boolean)),
-  ]
+  const rooms = course.room ? [course.room] : []
 
   const targetItems = course.course_targets.map(
     (t) => `${t.target_code}${t.target_name}${t.note ? `(${t.note})` : ""}`

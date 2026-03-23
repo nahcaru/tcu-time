@@ -22,16 +22,16 @@ graph TD
         LLM -->|JSON| V[バリデーション]
     end
 
-    subgraph "④ 統合 (Merge)"
-        V -->|時間表データ| MG{PDF種別?}
-        MG -->|時間表| DB[(Supabase DB)]
-        MG -->|変更一覧| DIFF[差分適用]
-        DIFF --> DB
+    subgraph "④ 審査・承認 (Review & Approve)"
+        V -->|生データ JSON| DB_E[(extractions テーブル)]
+        DB_E -->|Admin UI| REV[管理者によるレビュー・修正]
+        REV -->|Approve 実行| APR[データ反映処理]
+        APR -->|確定データ| DB_C[(courses / schedules テーブル)]
     end
 
     subgraph "⑤ エンリッチ (Enrich)"
-        DB -->|承認済み科目| SC[シラバススクレイパー]
-        SC -->|分類・単位| DB
+        DB_C -->|承認済み科目| SC[シラバススクレイパー]
+        SC -->|分類・単位| DB_C
     end
 ```
 
@@ -79,8 +79,7 @@ CREATE TABLE extractions (
   is_tentative BOOLEAN DEFAULT false,   -- 暫定版フラグ
   academic_year INT NOT NULL,
   status       TEXT DEFAULT 'pending'
-               CHECK (status IN ('pending','extracted','pending_review',
-                                  'approved','rejected')),
+               CHECK (status IN ('pending','extracted','approved')),
   raw_json     JSONB,
   error_log    TEXT,
   reviewed_by  UUID REFERENCES auth.users(id),
@@ -391,20 +390,19 @@ def parse_changelog(pdf_path: str) -> list[ChangeEntry]:
 各変更エントリを JSON として出力してください。
 
 出力スキーマ:
-{{
-  "change_type": "add | modify | cancel",
+{
+  "change_type": "create | update | delete",
   "course_code": "講義コード (あれば)",
   "course_name": "科目名",
   "term": "学期",
   "day": "曜日",
   "period": "時限",
-  "changes": {{
+  "changes": {
     "field": "変更対象フィールド",
     "old_value": "変更前の値 (あれば)",
     "new_value": "変更後の値"
-  }},
-  "reason": "変更理由 (あれば)"
-}}
+  }
+}
 
 変更一覧テキスト:
 {all_text}
@@ -418,11 +416,11 @@ def parse_changelog(pdf_path: str) -> list[ChangeEntry]:
 def apply_changelog(changes: list[ChangeEntry], semester: str):
     """変更一覧を既存データに適用"""
     for change in changes:
-        if change.change_type == "add":
+        if change.change_type == "create":
             # 新規科目: DB に挿入 (source_type = 'changelog')
             db.insert_course(change.to_course(), source_type="changelog")
 
-        elif change.change_type == "modify":
+        elif change.change_type == "update":
             # 既存科目を特定して更新
             course = db.find_course(
                 code=change.course_code,
@@ -436,14 +434,14 @@ def apply_changelog(changes: list[ChangeEntry], semester: str):
             else:
                 log.warning(f"変更対象の科目が見つかりません: {change}")
 
-        elif change.change_type == "cancel":
+        elif change.change_type == "delete":
             # 科目を削除 (or status='cancelled' に変更)
             course = db.find_course(
                 name=change.course_name,
                 term=change.term
             )
             if course:
-                db.mark_cancelled(course.id, reason=change.reason)
+                db.mark_cancelled(course.id)
 ```
 
 ### 科目の特定方法
@@ -564,20 +562,20 @@ flowchart TD
     CHK -->|あり| DL[PDF ダウンロード]
     DL --> CLS[Gemini: ページ分類<br/>表ページ + ヘッダー特定]
     CLS --> TYPE{PDF 種別?}
-    TYPE -->|時間表| EXT[Gemini: 科目抽出<br/>ヘッダー動的マッピング]
-    TYPE -->|変更一覧| CHG[Gemini: 変更解析<br/>変更エントリ抽出]
+    
+    TYPE -->|時間表| EXT[Gemini: 科目抽出]
+    TYPE -->|変更一覧| CHG[Gemini: 変更・差分解析]
+    TYPE -->|先行履修| ADV[Gemini: リスト抽出]
+
     EXT --> VAL[バリデーション]
-    VAL --> TENT{暫定版?}
-    TENT -->|はい| SAVE1[DB保存<br/>is_tentative=true]
-    TENT -->|いいえ| DEL[暫定版データ削除] --> SAVE2[DB保存<br/>is_tentative=false]
-    SAVE1 --> ENR
-    SAVE2 --> ENR
-    CHG --> DIFF[差分適用<br/>追加/変更/休講]
-    DIFF --> ENR
-    TYPE -->|先行履修| ADV[Gemini: 科目名リスト抽出]
-    ADV --> FLAG[advance_enrollment<br/>フラグ更新]
-    FLAG --> ENR[シラバスエンリッチ<br/>分類・単位取得]
-    ENR --> FIN
+    VAL --> SAVE_E[extractions テーブルに保存<br/>status='extracted']
+    CHG --> SAVE_E
+    ADV --> SAVE_E
+
+    SAVE_E --> UI[Admin UI / ReviewPage<br/>管理者による修正・Approve]
+    UI -->|Approve 実行| APR[各テーブルにデータ反映反映]
+    APR --> ENR[シラバスエンリッチ<br/>自動トリガー]
+    ENR --> FIN[完了]
 ```
 
 ### GitHub Actions ワークフロー

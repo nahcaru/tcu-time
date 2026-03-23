@@ -98,8 +98,8 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
       const credits = course.course_metadata[0]?.credits ?? 0
       const category = course.course_metadata[0]?.category
 
-      const hasSpring = course.schedules.some((s) => s.term.startsWith("前"))
-      const hasFall = course.schedules.some((s) => s.term.startsWith("後"))
+      const hasSpring = course.term?.startsWith("前") ?? false
+      const hasFall = course.term?.startsWith("後") ?? false
 
       // Define bucket based on category
       let bucket: "practical" | "research" | "lectures" = "lectures"
