@@ -641,9 +641,9 @@ class TestCheckForUpdates:
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
-    @patch("pipeline.db.get_stored_pdf_links")
-    @patch("pipeline.db.upsert_pdf_link")
-    @patch("pipeline.db.create_extraction")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     def test_check_for_updates_new_pdf(
         self,
         mock_create_extraction,
@@ -666,9 +666,9 @@ class TestCheckForUpdates:
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
-    @patch("pipeline.db.get_stored_pdf_links")
-    @patch("pipeline.db.upsert_pdf_link")
-    @patch("pipeline.db.create_extraction")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     def test_check_for_updates_changed_pdf(
         self,
         mock_create_extraction,
@@ -696,9 +696,9 @@ class TestCheckForUpdates:
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
-    @patch("pipeline.db.get_stored_pdf_links")
-    @patch("pipeline.db.upsert_pdf_link")
-    @patch("pipeline.db.create_extraction")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     def test_check_for_updates_no_changes(
         self,
         mock_create_extraction,
@@ -727,9 +727,9 @@ class TestCheckForUpdates:
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
-    @patch("pipeline.db.get_stored_pdf_links")
-    @patch("pipeline.db.upsert_pdf_link")
-    @patch("pipeline.db.create_extraction")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     def test_check_for_updates_mixed_scenario(
         self,
         mock_create_extraction,
@@ -762,7 +762,7 @@ class TestCheckForUpdates:
         assert mock_create_extraction.call_count == 1
 
     @patch("pipeline.monitor.fetch_page")
-    @patch("pipeline.db.get_stored_pdf_links")
+    @patch("pipeline.monitor.get_stored_pdf_links")
     def test_check_for_updates_no_links_found(
         self,
         mock_get_stored,
@@ -778,9 +778,9 @@ class TestCheckForUpdates:
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
-    @patch("pipeline.db.get_stored_pdf_links")
-    @patch("pipeline.db.upsert_pdf_link")
-    @patch("pipeline.db.create_extraction")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     def test_check_for_updates_return_structure(
         self,
         mock_create_extraction,
@@ -825,9 +825,9 @@ class TestCheckForUpdates:
 
     @patch("pipeline.monitor.fetch_page")
     @patch("pipeline.monitor.download_pdf")
-    @patch("pipeline.db.get_stored_pdf_links")
-    @patch("pipeline.db.upsert_pdf_link")
-    @patch("pipeline.db.create_extraction")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     def test_check_for_updates_calls_db_functions(
         self,
         mock_create_extraction,

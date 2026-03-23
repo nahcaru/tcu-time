@@ -56,14 +56,12 @@ class TestDetectAcademicYear:
 
 
 class TestHandleTimetable:
-    @patch("pipeline.main.db")
-    @patch("pipeline.extractor.extract_courses_from_pdf")
-    @patch("pipeline.classifier.classify_pages")
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.extract_courses_from_pdf")
     def test_normal_case_saves_raw_json(
-        self, mock_classify: Mock, mock_extract: Mock, mock_db: Mock
+        self, mock_extract: Mock, mock_update_status: Mock
     ) -> None:
         """Normal: courses extracted → saved as raw_json, status='extracted', NOT upserted."""
-        mock_classify.return_value = [Mock(type="course_table_spring")]
         course1 = Mock(model_dump=Mock(return_value={"code": "smab020161", "name": "Test"}))
         course2 = Mock(model_dump=Mock(return_value={"code": "smab020162", "name": "Test2"}))
         mock_extract.return_value = [course1, course2]
@@ -78,21 +76,17 @@ class TestHandleTimetable:
         )
 
         assert result == 2
-        # Must NOT call upsert_courses — data waits for approval
-        mock_db.upsert_courses.assert_not_called()
         # Must save raw_json with status='extracted'
-        mock_db.update_extraction_status.assert_called_once()
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        mock_update_status.assert_called_once()
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["count"] == 2
         assert call_kwargs["raw_json"]["courses"][0]["code"] == "smab020161"
 
-    @patch("pipeline.main.db")
-    @patch("pipeline.extractor.extract_courses_from_pdf")
-    @patch("pipeline.classifier.classify_pages")
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.extract_courses_from_pdf")
     def test_no_courses_extracted(
-        self, mock_classify: Mock, mock_extract: Mock, mock_db: Mock
+        self, mock_extract: Mock, mock_update_status: Mock
     ) -> None:
-        mock_classify.return_value = []
         mock_extract.return_value = []
 
         result = _handle_timetable(
@@ -105,18 +99,15 @@ class TestHandleTimetable:
         )
 
         assert result == 0
-        mock_db.upsert_courses.assert_not_called()
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["count"] == 0
 
-    @patch("pipeline.main.db")
-    @patch("pipeline.extractor.extract_courses_from_pdf")
-    @patch("pipeline.classifier.classify_pages")
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.extract_courses_from_pdf")
     def test_confirmed_fall_raw_json_includes_semester(
-        self, mock_classify: Mock, mock_extract: Mock, mock_db: Mock
+        self, mock_extract: Mock, mock_update_status: Mock
     ) -> None:
         """Confirmed fall: semester and is_tentative saved in raw_json, NOT immediately deleted."""
-        mock_classify.return_value = [Mock(type="course_table_fall")]
         course1 = Mock(model_dump=Mock(return_value={"code": "smab020161", "name": "Test"}))
         mock_extract.return_value = [course1]
 
@@ -129,10 +120,8 @@ class TestHandleTimetable:
             2025,
         )
 
-        # delete should NOT be called here — it's called at approval time
-        mock_db.delete_courses.assert_not_called()
         # raw_json must contain the metadata for later use at approval
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["semester"] == "fall"
         assert call_kwargs["raw_json"]["is_tentative"] is False
 
@@ -143,10 +132,10 @@ class TestHandleTimetable:
 
 
 class TestHandleChangelog:
-    @patch("pipeline.main.db")
-    @patch("pipeline.changelog.parse_changelog")
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.parse_changelog")
     def test_normal_case_saves_raw_json(
-        self, mock_parse: Mock, mock_db: Mock
+        self, mock_parse: Mock, mock_update_status: Mock
     ) -> None:
         """Normal: changes parsed → saved as raw_json, NOT applied immediately."""
         change1 = Mock(model_dump=Mock(return_value={"change_type": "create"}))
@@ -162,15 +151,15 @@ class TestHandleChangelog:
         )
 
         mock_parse.assert_called_once_with(b"fake pdf")
-        mock_db.update_extraction_status.assert_called_once()
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        mock_update_status.assert_called_once()
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["count"] == 2
         assert call_kwargs["raw_json"]["semester"] == "spring"
         assert call_kwargs["raw_json"]["academic_year"] == 2025
 
-    @patch("pipeline.main.db")
-    @patch("pipeline.changelog.parse_changelog")
-    def test_no_changes_parsed(self, mock_parse: Mock, mock_db: Mock) -> None:
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.parse_changelog")
+    def test_no_changes_parsed(self, mock_parse: Mock, mock_update_status: Mock) -> None:
         mock_parse.return_value = []
 
         _handle_changelog(
@@ -181,14 +170,14 @@ class TestHandleChangelog:
             2025,
         )
 
-        mock_db.update_extraction_status.assert_called_once()
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        mock_update_status.assert_called_once()
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["count"] == 0
 
-    @patch("pipeline.main.db")
-    @patch("pipeline.changelog.parse_changelog")
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.parse_changelog")
     def test_semester_str_none_defaults_to_spring(
-        self, mock_parse: Mock, mock_db: Mock
+        self, mock_parse: Mock, mock_update_status: Mock
     ) -> None:
         change1 = Mock(model_dump=Mock(return_value={"change_type": "create"}))
         mock_parse.return_value = [change1]
@@ -201,7 +190,7 @@ class TestHandleChangelog:
             2025,
         )
 
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["semester"] == "spring"
 
 
@@ -211,10 +200,10 @@ class TestHandleChangelog:
 
 
 class TestHandleAdvanceEnrollment:
-    @patch("pipeline.main.db")
-    @patch("pipeline.advance.extract_course_names")
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.extract_course_names")
     def test_normal_case_saves_raw_json(
-        self, mock_extract_names: Mock, mock_db: Mock
+        self, mock_extract_names: Mock, mock_update_status: Mock
     ) -> None:
         """Normal: names extracted → saved as raw_json, flags NOT updated immediately."""
         mock_extract_names.return_value = ["Course1", "Course2"]
@@ -227,19 +216,16 @@ class TestHandleAdvanceEnrollment:
         )
 
         mock_extract_names.assert_called_once_with(b"fake pdf")
-        # Must NOT call set_advance_enrollment or reset_advance_enrollment
-        mock_db.set_advance_enrollment.assert_not_called()
-        mock_db.reset_advance_enrollment.assert_not_called()
         # Must save raw_json
-        mock_db.update_extraction_status.assert_called_once()
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        mock_update_status.assert_called_once()
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["count"] == 2
         assert call_kwargs["raw_json"]["names"] == ["Course1", "Course2"]
 
-    @patch("pipeline.main.db")
-    @patch("pipeline.advance.extract_course_names")
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.extract_course_names")
     def test_no_names_extracted(
-        self, mock_extract_names: Mock, mock_db: Mock
+        self, mock_extract_names: Mock, mock_update_status: Mock
     ) -> None:
         mock_extract_names.return_value = []
 
@@ -250,8 +236,8 @@ class TestHandleAdvanceEnrollment:
             2025,
         )
 
-        mock_db.update_extraction_status.assert_called_once()
-        call_kwargs = mock_db.update_extraction_status.call_args[1]
+        mock_update_status.assert_called_once()
+        call_kwargs = mock_update_status.call_args[1]
         assert call_kwargs["raw_json"]["count"] == 0
 
 
@@ -261,14 +247,14 @@ class TestHandleAdvanceEnrollment:
 
 
 class TestRunPipeline:
-    @patch("pipeline.main.db")
+    @patch("pipeline.main.get_pending_extractions")
     @patch("pipeline.config.Config.validate")
     @patch("pipeline.monitor.check_for_updates")
     def test_no_updates_returns_early(
-        self, mock_check_updates: Mock, mock_validate: Mock, mock_db: Mock
+        self, mock_check_updates: Mock, mock_validate: Mock, mock_get_pending: Mock
     ) -> None:
         mock_check_updates.return_value = []
-        mock_db.get_pending_extractions.return_value = []
+        mock_get_pending.return_value = []
 
         run_pipeline()
 
@@ -277,7 +263,7 @@ class TestRunPipeline:
 
     @patch("pipeline.main._handle_timetable")
     @patch("pipeline.monitor.compute_hash")
-    @patch("pipeline.main.db")
+    @patch("pipeline.main.get_pending_extractions")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.config.Config.validate")
     @patch("pipeline.monitor.check_for_updates")
@@ -286,7 +272,7 @@ class TestRunPipeline:
         mock_check_updates: Mock,
         mock_validate: Mock,
         mock_download_pdf: Mock,
-        mock_db: Mock,
+        mock_get_pending: Mock,
         mock_compute_hash: Mock,
         mock_handle_timetable: Mock,
     ) -> None:
@@ -303,7 +289,7 @@ class TestRunPipeline:
         ]
         mock_download_pdf.return_value = pdf_bytes
         mock_compute_hash.return_value = "hash123"
-        mock_db.get_pending_extractions.side_effect = [
+        mock_get_pending.side_effect = [
             [
                 {
                     "id": "ext123",
@@ -324,7 +310,7 @@ class TestRunPipeline:
 
     @patch("pipeline.main._handle_changelog")
     @patch("pipeline.monitor.compute_hash")
-    @patch("pipeline.main.db")
+    @patch("pipeline.main.get_pending_extractions")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.config.Config.validate")
     @patch("pipeline.monitor.check_for_updates")
@@ -333,7 +319,7 @@ class TestRunPipeline:
         mock_check_updates: Mock,
         mock_validate: Mock,
         mock_download_pdf: Mock,
-        mock_db: Mock,
+        mock_get_pending: Mock,
         mock_compute_hash: Mock,
         mock_handle_changelog: Mock,
     ) -> None:
@@ -349,7 +335,7 @@ class TestRunPipeline:
         ]
         mock_download_pdf.return_value = pdf_bytes
         mock_compute_hash.return_value = "hash456"
-        mock_db.get_pending_extractions.side_effect = [
+        mock_get_pending.side_effect = [
             [
                 {
                     "id": "ext456",
@@ -368,7 +354,7 @@ class TestRunPipeline:
 
     @patch("pipeline.main._handle_advance_enrollment")
     @patch("pipeline.monitor.compute_hash")
-    @patch("pipeline.main.db")
+    @patch("pipeline.main.get_pending_extractions")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.config.Config.validate")
     @patch("pipeline.monitor.check_for_updates")
@@ -377,7 +363,7 @@ class TestRunPipeline:
         mock_check_updates: Mock,
         mock_validate: Mock,
         mock_download_pdf: Mock,
-        mock_db: Mock,
+        mock_get_pending: Mock,
         mock_compute_hash: Mock,
         mock_handle_advance_enrollment: Mock,
     ) -> None:
@@ -393,7 +379,7 @@ class TestRunPipeline:
         ]
         mock_download_pdf.return_value = pdf_bytes
         mock_compute_hash.return_value = "hash789"
-        mock_db.get_pending_extractions.side_effect = [
+        mock_get_pending.side_effect = [
             [
                 {
                     "id": "ext789",
@@ -411,7 +397,7 @@ class TestRunPipeline:
         mock_handle_advance_enrollment.assert_called_once()
 
     @patch("pipeline.monitor.compute_hash")
-    @patch("pipeline.main.db")
+    @patch("pipeline.main.get_pending_extractions")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.config.Config.validate")
     @patch("pipeline.monitor.check_for_updates")
@@ -420,7 +406,7 @@ class TestRunPipeline:
         mock_check_updates: Mock,
         mock_validate: Mock,
         mock_download_pdf: Mock,
-        mock_db: Mock,
+        mock_get_pending: Mock,
         mock_compute_hash: Mock,
     ) -> None:
         mock_check_updates.return_value = [
@@ -440,7 +426,7 @@ class TestRunPipeline:
             },
         ]
         mock_download_pdf.side_effect = Exception("Network error")
-        mock_db.get_pending_extractions.return_value = []
+        mock_get_pending.return_value = []
 
         run_pipeline()  # should not raise
 
@@ -448,7 +434,7 @@ class TestRunPipeline:
 
     @patch("pipeline.main._handle_timetable")
     @patch("pipeline.monitor.compute_hash")
-    @patch("pipeline.main.db")
+    @patch("pipeline.main.get_pending_extractions")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.config.Config.validate")
     @patch("pipeline.monitor.check_for_updates")
@@ -457,7 +443,7 @@ class TestRunPipeline:
         mock_check_updates: Mock,
         mock_validate: Mock,
         mock_download_pdf: Mock,
-        mock_db: Mock,
+        mock_get_pending: Mock,
         mock_compute_hash: Mock,
         mock_handle_timetable: Mock,
     ) -> None:
@@ -473,7 +459,7 @@ class TestRunPipeline:
         ]
         mock_download_pdf.return_value = pdf_bytes
         mock_compute_hash.return_value = "hash123"
-        mock_db.get_pending_extractions.return_value = []
+        mock_get_pending.return_value = []
 
         run_pipeline()
 
@@ -481,7 +467,7 @@ class TestRunPipeline:
 
     @patch("pipeline.main._handle_timetable")
     @patch("pipeline.monitor.compute_hash")
-    @patch("pipeline.main.db")
+    @patch("pipeline.main.get_pending_extractions")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.config.Config.validate")
     @patch("pipeline.monitor.check_for_updates")
@@ -490,7 +476,7 @@ class TestRunPipeline:
         mock_check_updates: Mock,
         mock_validate: Mock,
         mock_download_pdf: Mock,
-        mock_db: Mock,
+        mock_get_pending: Mock,
         mock_compute_hash: Mock,
         mock_handle_timetable: Mock,
     ) -> None:
@@ -507,7 +493,7 @@ class TestRunPipeline:
         ]
         mock_download_pdf.return_value = pdf_bytes
         mock_compute_hash.return_value = "hash123"
-        mock_db.get_pending_extractions.side_effect = [
+        mock_get_pending.side_effect = [
             [
                 {
                     "id": "ext123",

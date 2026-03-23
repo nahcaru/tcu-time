@@ -43,8 +43,10 @@ bun run lint         # ESLint
 cd pipeline
 uv sync
 uv run pytest        # Run tests
-uv run python -m pipeline.extractor   # Run extractor
+uv run python -m pipeline.main        # Run monitor + extraction workflow
 ```
+
+Pipeline runs save extracted PDF results to `extractions.raw_json` for admin approval. Approved data is applied to course tables separately; extraction does not write course rows directly.
 
 ### Environment Variables
 

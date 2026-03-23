@@ -1,4 +1,4 @@
-"""Tests for pipeline/advance.py (parse-only, no DB reflection)."""
+"""Tests for pipeline/extractors/advance.py."""
 
 from __future__ import annotations
 
@@ -7,127 +7,60 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from ..advance import _request_course_names, extract_course_names
+from ..extractors.advance import _request_course_names, extract_course_names
 
 
 class TestRequestCourseNames:
-    def test_valid_response(self) -> None:
-        with patch("pipeline.advance.genai.Client") as mock_client_class:
-            mock_response = Mock()
-            mock_response.text = json.dumps(["科目A", "科目B"])
-            mock_client = Mock()
-            mock_client.models.generate_content.return_value = mock_response
-            mock_client_class.return_value = mock_client
+    @patch("pipeline.extractors.advance.create_client")
+    @patch("pipeline.extractors.advance.generate_pdf_json")
+    def test_valid_response(
+        self, mock_generate_pdf_json: Mock, mock_create_client: Mock
+    ) -> None:
+        mock_create_client.return_value = Mock()
+        mock_generate_pdf_json.return_value = json.dumps({"course_names": ["科目A", "科目B"]})
 
-            result = _request_course_names("gemini-model", "test text")
-            assert result == ["科目A", "科目B"]
+        result = _request_course_names("gemini-model", b"pdf bytes")
+        assert result == ["科目A", "科目B"]
 
-    def test_response_text_none(self) -> None:
-        with patch("pipeline.advance.genai.Client") as mock_client_class:
-            mock_response = Mock()
-            mock_response.text = None
-            mock_client = Mock()
-            mock_client.models.generate_content.return_value = mock_response
-            mock_client_class.return_value = mock_client
+    @patch("pipeline.extractors.advance.create_client")
+    @patch("pipeline.extractors.advance.generate_pdf_json")
+    def test_invalid_shape_raises(
+        self, mock_generate_pdf_json: Mock, mock_create_client: Mock
+    ) -> None:
+        mock_create_client.return_value = Mock()
+        mock_generate_pdf_json.return_value = json.dumps(["科目A", "科目B"])
 
-            with pytest.raises(ValueError, match="Gemini response did not include text"):
-                _request_course_names("gemini-model", "test text")
-
-    def test_response_not_list(self) -> None:
-        with patch("pipeline.advance.genai.Client") as mock_client_class:
-            mock_response = Mock()
-            mock_response.text = json.dumps({"not": "a list"})
-            mock_client = Mock()
-            mock_client.models.generate_content.return_value = mock_response
-            mock_client_class.return_value = mock_client
-
-            with pytest.raises(ValueError, match="Gemini JSON response must be a list"):
-                _request_course_names("gemini-model", "test text")
-
-    def test_response_list_non_strings(self) -> None:
-        with patch("pipeline.advance.genai.Client") as mock_client_class:
-            mock_response = Mock()
-            mock_response.text = json.dumps([1, 2, 3])
-            mock_client = Mock()
-            mock_client.models.generate_content.return_value = mock_response
-            mock_client_class.return_value = mock_client
-
-            with pytest.raises(ValueError, match="Gemini JSON response must be a list of strings"):
-                _request_course_names("gemini-model", "test text")
+        with pytest.raises(ValueError):
+            _request_course_names("gemini-model", b"pdf bytes")
 
 
 class TestExtractCourseNames:
-    def test_extract_with_valid_pdf(self) -> None:
-        """extract_course_names returns list[str] — no DB side effects."""
-        pdf_bytes = b"test pdf content"
-        with (
-            patch("pipeline.advance.pdfplumber.open") as mock_open,
-            patch("pipeline.advance._request_course_names") as mock_request,
-            patch("pipeline.advance.Config") as mock_config,
-        ):
-            mock_config.GEMINI_MODEL = "primary-model"
+    @patch("pipeline.extractors.advance._request_course_names")
+    @patch("pipeline.extractors.advance.Settings")
+    def test_extract_with_primary_model(
+        self, mock_settings: Mock, mock_request: Mock
+    ) -> None:
+        mock_settings.GEMINI_MODEL = "primary-model"
+        mock_settings.GEMINI_FALLBACK_MODEL = "fallback-model"
+        mock_request.return_value = ["科目A", "科目B"]
 
-            mock_page1 = Mock()
-            mock_page1.extract_text.return_value = "Page 1 text"
-            mock_page2 = Mock()
-            mock_page2.extract_text.return_value = "Page 2 text"
-            mock_pdf = Mock()
-            mock_pdf.pages = [mock_page1, mock_page2]
-            mock_pdf.__enter__ = Mock(return_value=mock_pdf)
-            mock_pdf.__exit__ = Mock(return_value=None)
-            mock_open.return_value = mock_pdf
-            mock_request.return_value = ["科目A", "科目B"]
+        result = extract_course_names(b"pdf bytes")
 
-            result = extract_course_names(pdf_bytes)
+        assert result == ["科目A", "科目B"]
+        mock_request.assert_called_once_with("primary-model", b"pdf bytes")
 
-            assert result == ["科目A", "科目B"]
-            mock_request.assert_called_once_with("primary-model", "Page 1 text\nPage 2 text")
+    @patch("pipeline.extractors.advance.logger")
+    @patch("pipeline.extractors.advance._request_course_names")
+    @patch("pipeline.extractors.advance.Settings")
+    def test_extract_fallback_on_primary_failure(
+        self, mock_settings: Mock, mock_request: Mock, mock_logger: Mock
+    ) -> None:
+        mock_settings.GEMINI_MODEL = "primary-model"
+        mock_settings.GEMINI_FALLBACK_MODEL = "fallback-model"
+        mock_request.side_effect = [Exception("Primary failed"), ["科目C", "科目D"]]
 
-    def test_extract_fallback_on_primary_failure(self) -> None:
-        pdf_bytes = b"test pdf content"
-        with (
-            patch("pipeline.advance.pdfplumber.open") as mock_open,
-            patch("pipeline.advance._request_course_names") as mock_request,
-            patch("pipeline.advance.Config") as mock_config,
-            patch("pipeline.advance.logger") as mock_logger,
-        ):
-            mock_config.GEMINI_MODEL = "primary-model"
-            mock_config.GEMINI_FALLBACK_MODEL = "fallback-model"
+        result = extract_course_names(b"pdf bytes")
 
-            mock_page1 = Mock()
-            mock_page1.extract_text.return_value = "Page 1 text"
-            mock_pdf = Mock()
-            mock_pdf.pages = [mock_page1]
-            mock_pdf.__enter__ = Mock(return_value=mock_pdf)
-            mock_pdf.__exit__ = Mock(return_value=None)
-            mock_open.return_value = mock_pdf
-            mock_request.side_effect = [Exception("Primary failed"), ["科目C", "科目D"]]
-
-            result = extract_course_names(pdf_bytes)
-
-            assert result == ["科目C", "科目D"]
-            assert mock_request.call_count == 2
-            mock_logger.warning.assert_called_once()
-
-    def test_extract_empty_pdf_still_calls_gemini(self) -> None:
-        pdf_bytes = b"test pdf content"
-        with (
-            patch("pipeline.advance.pdfplumber.open") as mock_open,
-            patch("pipeline.advance._request_course_names") as mock_request,
-            patch("pipeline.advance.Config") as mock_config,
-        ):
-            mock_config.GEMINI_MODEL = "primary-model"
-
-            mock_page = Mock()
-            mock_page.extract_text.return_value = None
-            mock_pdf = Mock()
-            mock_pdf.pages = [mock_page]
-            mock_pdf.__enter__ = Mock(return_value=mock_pdf)
-            mock_pdf.__exit__ = Mock(return_value=None)
-            mock_open.return_value = mock_pdf
-            mock_request.return_value = ["科目E"]
-
-            result = extract_course_names(pdf_bytes)
-
-            assert result == ["科目E"]
-            mock_request.assert_called_once_with("primary-model", "")
+        assert result == ["科目C", "科目D"]
+        assert mock_request.call_count == 2
+        mock_logger.warning.assert_called_once()

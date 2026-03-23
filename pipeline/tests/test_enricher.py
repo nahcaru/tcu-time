@@ -325,7 +325,7 @@ class TestScrapeSyllabus:
 class TestEnrichCourses:
     """Test main enrichment orchestration."""
 
-    @patch("pipeline.enricher.db.upsert_metadata")
+    @patch("pipeline.enricher.upsert_metadata")
     @patch("pipeline.enricher.scrape_syllabus")
     @patch("pipeline.enricher.time.sleep")
     def test_empty_course_list(
@@ -339,7 +339,7 @@ class TestEnrichCourses:
         mock_scrape.assert_not_called()
         mock_upsert.assert_not_called()
 
-    @patch("pipeline.enricher.db.upsert_metadata")
+    @patch("pipeline.enricher.upsert_metadata")
     @patch("pipeline.enricher.scrape_syllabus")
     @patch("pipeline.enricher.time.sleep")
     def test_two_courses_both_succeed(
@@ -368,7 +368,7 @@ class TestEnrichCourses:
         assert mock_upsert.call_count == 2
         assert mock_sleep.call_count == 1  # sleep between courses
 
-    @patch("pipeline.enricher.db.upsert_metadata")
+    @patch("pipeline.enricher.upsert_metadata")
     @patch("pipeline.enricher.scrape_syllabus")
     @patch("pipeline.enricher.time.sleep")
     def test_one_course_scrape_fails(
@@ -386,7 +386,7 @@ class TestEnrichCourses:
         mock_scrape.assert_called_once()
         mock_upsert.assert_not_called()
 
-    @patch("pipeline.enricher.db.upsert_metadata")
+    @patch("pipeline.enricher.upsert_metadata")
     @patch("pipeline.enricher.scrape_syllabus")
     @patch("pipeline.enricher.time.sleep")
     def test_scrape_succeeds_db_upsert_fails(
@@ -408,7 +408,7 @@ class TestEnrichCourses:
         mock_scrape.assert_called_once()
         mock_upsert.assert_called_once()
 
-    @patch("pipeline.enricher.db.upsert_metadata")
+    @patch("pipeline.enricher.upsert_metadata")
     @patch("pipeline.enricher.scrape_syllabus")
     @patch("pipeline.enricher.time.sleep")
     def test_mixed_success_and_failure(

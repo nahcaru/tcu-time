@@ -23,7 +23,7 @@ from ..monitor import (
     check_for_updates,
     compute_hash as monitor_hash,
 )
-from ..extractor import (
+from ..extractors.timetable import (
     extract_courses_from_pdf,
 )
 from ..enricher import (
@@ -112,28 +112,32 @@ class TestE2EMonitor:
         for link in links:
             assert "総合理工学研究科" in link.label
 
-    @patch("pipeline.monitor.db")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.monitor.fetch_page")
     def test_monitor_queues_new_pdfs(
         self,
         mock_fetch: MagicMock,
         mock_download: MagicMock,
-        mock_db: MagicMock,
+        mock_create_extraction: MagicMock,
+        mock_upsert_pdf_link: MagicMock,
+        mock_get_stored_pdf_links: MagicMock,
     ) -> None:
         """Monitor should queue all 3 PDFs when DB is empty (first run)."""
         mock_fetch.return_value = REALISTIC_HTML
         mock_download.return_value = b"fake-pdf-bytes"
-        mock_db.get_stored_pdf_links.return_value = {}
-        mock_db.upsert_pdf_link.return_value = {"id": "link-1"}
-        mock_db.create_extraction.return_value = {"id": "ext-1"}
+        mock_get_stored_pdf_links.return_value = {}
+        mock_upsert_pdf_link.return_value = {"id": "link-1"}
+        mock_create_extraction.return_value = {"id": "ext-1"}
 
         result = check_for_updates("https://fake-url.com")
 
         assert len(result) == 3
         assert all(r["action"] == "new" for r in result)
-        assert mock_db.upsert_pdf_link.call_count == 3
-        assert mock_db.create_extraction.call_count == 3
+        assert mock_upsert_pdf_link.call_count == 3
+        assert mock_create_extraction.call_count == 3
 
 
 # =============================================================================
@@ -203,16 +207,16 @@ class TestE2EEnricher:
 
     @patch("pipeline.enricher.time.sleep")
     @patch("pipeline.enricher.fetch_syllabus_page")
-    @patch("pipeline.enricher.db")
+    @patch("pipeline.enricher.upsert_metadata")
     def test_enricher_processes_courses(
         self,
-        mock_db: MagicMock,
+        mock_upsert_metadata: MagicMock,
         mock_fetch: MagicMock,
         mock_sleep: MagicMock,
     ) -> None:
         """Enricher should process courses and call db.upsert_metadata."""
         mock_fetch.return_value = FAKE_SYLLABUS_HTML
-        mock_db.upsert_metadata.return_value = {"id": "meta-1"}
+        mock_upsert_metadata.return_value = {"id": "meta-1"}
 
         # Simulate 2 courses from extractor output
         courses = [
@@ -234,7 +238,7 @@ class TestE2EEnricher:
 
         assert success == 2
         assert failure == 0
-        assert mock_db.upsert_metadata.call_count == 2
+        assert mock_upsert_metadata.call_count == 2
 
     @patch("pipeline.enricher.fetch_syllabus_page")
     def test_scrape_syllabus_returns_metadata(
@@ -263,16 +267,20 @@ class TestE2EFullPipeline:
 
     @patch("pipeline.enricher.time.sleep")
     @patch("pipeline.enricher.fetch_syllabus_page")
-    @patch("pipeline.enricher.db")
-    @patch("pipeline.monitor.db")
+    @patch("pipeline.enricher.upsert_metadata")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.upsert_pdf_link")
+    @patch("pipeline.monitor.create_extraction")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.monitor.fetch_page")
     def test_full_pipeline_flow(
         self,
         mock_fetch_page: MagicMock,
         mock_download_pdf: MagicMock,
-        mock_monitor_db: MagicMock,
-        mock_enricher_db: MagicMock,
+        mock_create_extraction: MagicMock,
+        mock_upsert_pdf_link: MagicMock,
+        mock_get_stored_pdf_links: MagicMock,
+        mock_upsert_metadata: MagicMock,
         mock_fetch_syllabus: MagicMock,
         mock_sleep: MagicMock,
         reference_pdf_bytes: bytes,
@@ -285,9 +293,9 @@ class TestE2EFullPipeline:
         # --- Stage 1: Monitor ---
         mock_fetch_page.return_value = REALISTIC_HTML
         mock_download_pdf.return_value = reference_pdf_bytes
-        mock_monitor_db.get_stored_pdf_links.return_value = {}
-        mock_monitor_db.upsert_pdf_link.return_value = {"id": "link-1"}
-        mock_monitor_db.create_extraction.return_value = {"id": "ext-1"}
+        mock_get_stored_pdf_links.return_value = {}
+        mock_upsert_pdf_link.return_value = {"id": "link-1"}
+        mock_create_extraction.return_value = {"id": "ext-1"}
 
         queued = check_for_updates("https://fake-url.com")
         assert len(queued) >= 1  # At least the front semester PDF
@@ -300,7 +308,7 @@ class TestE2EFullPipeline:
         # --- Stage 3: Enricher ---
         # Simulate DB output from extractor: courses with IDs
         mock_fetch_syllabus.return_value = FAKE_SYLLABUS_HTML
-        mock_enricher_db.upsert_metadata.return_value = {"id": "meta-1"}
+        mock_upsert_metadata.return_value = {"id": "meta-1"}
 
         course_rows = [
             {"id": f"course-{i}", "code": c.code, "name": c.name, "targets": []}
@@ -311,16 +319,18 @@ class TestE2EFullPipeline:
 
         assert success == 3
         assert failure == 0
-        assert mock_enricher_db.upsert_metadata.call_count == 3
+        assert mock_upsert_metadata.call_count == 3
 
-    @patch("pipeline.monitor.db")
+    @patch("pipeline.monitor.get_stored_pdf_links")
+    @patch("pipeline.monitor.create_extraction")
     @patch("pipeline.monitor.download_pdf")
     @patch("pipeline.monitor.fetch_page")
     def test_no_change_skips_pipeline(
         self,
         mock_fetch_page: MagicMock,
         mock_download_pdf: MagicMock,
-        mock_db: MagicMock,
+        mock_create_extraction: MagicMock,
+        mock_get_stored_pdf_links: MagicMock,
         reference_pdf_bytes: bytes,
     ) -> None:
         """When PDFs haven't changed, nothing should be queued."""
@@ -330,7 +340,7 @@ class TestE2EFullPipeline:
         mock_download_pdf.return_value = reference_pdf_bytes
 
         # All 3 links already stored with current hashes
-        mock_db.get_stored_pdf_links.return_value = {
+        mock_get_stored_pdf_links.return_value = {
             FAKE_PDF_URL: {"hash": pdf_hash},
             "https://www.asc.tcu.ac.jp/wp-content/uploads/2025/09/back.pdf": {"hash": pdf_hash},
             "https://www.asc.tcu.ac.jp/wp-content/uploads/2025/04/changes.pdf": {"hash": pdf_hash},
@@ -338,4 +348,4 @@ class TestE2EFullPipeline:
 
         queued = check_for_updates("https://fake-url.com")
         assert len(queued) == 0
-        mock_db.create_extraction.assert_not_called()
+        mock_create_extraction.assert_not_called()

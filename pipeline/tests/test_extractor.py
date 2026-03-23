@@ -7,9 +7,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ..extractor import (
+from ..extractors.timetable import (
     _raw_to_extracted_course,
     deduplicate_courses,
+    extract_courses_from_pdf,
 )
 from ..models import CourseTarget, ExtractedCourse, Schedule, Semester
 
@@ -189,7 +190,10 @@ class TestDeduplicateCourses:
         merged = deduplicate_courses([c1, c2])
         assert len(merged) == 1
         assert len(merged[0].schedules) == 2
-        assert {(s.day, s.period) for s in merged[0].schedules} == {("月", 1), ("木", 1)}
+        assert {(s.day, s.period) for s in merged[0].schedules} == {
+            ("月", 1),
+            ("木", 1),
+        }
 
     def test_different_codes_kept_separate(self) -> None:
         c1 = ExtractedCourse(
@@ -222,29 +226,3 @@ class TestDeduplicateCourses:
         )
         merged = deduplicate_courses([c1, c2])
         assert len(merged[0].schedules) == 1
-
-
-# ---------------------------------------------------------------------------
-# extract_courses_from_pdf — integration (skipped without reference PDF)
-# ---------------------------------------------------------------------------
-
-
-class TestExtractCoursesFromPdfIntegration:
-    @pytest.mark.skipif(
-        not (Path(__file__).resolve().parents[2] / "References" / "grad_timetable_front.pdf").exists(),
-        reason="Reference PDF not found",
-    )
-    def test_extract_courses_from_reference_pdf(self, reference_pdf_path: Path) -> None:
-        """Integration test using real Gemini API. Requires GEMINI_API_KEY env var."""
-        from ..extractor import extract_courses_from_pdf
-
-        pdf_bytes = reference_pdf_path.read_bytes()
-
-        with patch("pipeline.extractor.Config") as mock_config:
-            mock_config.GEMINI_API_KEY = "test"
-            mock_config.GEMINI_MODEL = "gemini-1.5-flash"
-            mock_config.GEMINI_FALLBACK_MODEL = "gemini-1.5-pro"
-
-            courses = extract_courses_from_pdf(pdf_bytes)
-
-        assert isinstance(courses, list)
