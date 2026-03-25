@@ -5,7 +5,14 @@
  * - Selected target/department
  * - Earned credits per category
  */
-import { createContext, useContext, useCallback, useEffect, useState, ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useState,
+} from "react"
+import type { ReactNode } from "react"
 import { supabase } from "@/lib/supabase"
 import type { UserSettings } from "@/lib/database.types"
 import { useAuth } from "./use-auth"

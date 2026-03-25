@@ -24,6 +24,16 @@ interface CreditsTableProps {
   enrolledCourses: CourseWithRelations[]
 }
 
+type EarnedCreditsValue = {
+  practical?: number | string | null
+  research?: number | string | null
+  lectures?: number | string | null
+}
+
+function isEarnedCreditsValue(value: unknown): value is EarnedCreditsValue {
+  return typeof value === "object" && value !== null
+}
+
 export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
   const isSpring = termType === "前期"
   const { settings, updateSettings } = useSettings()
@@ -36,9 +46,10 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
   }
 
   const earnedCredits = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const credits = settings?.earned_credits as any
-    const parse = (v: any) =>
+    const credits = isEarnedCreditsValue(settings?.earned_credits)
+      ? settings.earned_credits
+      : undefined
+    const parse = (v: number | string | null | undefined) =>
       typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) || 0 : 0
 
     return {
@@ -89,6 +100,11 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
   const reqLectures = isNuclear ? 20 : 18
   const reqTotal = 30
 
+  const normalizeTargetCode = (code: string) => code.replace(/^0+/, "") || "0"
+  const isEnglishNamedCourse = (name: string) =>
+    /^[A-Za-z0-9\s!-/:-@[-`{-~]+$/.test(name) &&
+    !/[ぁ-ゖァ-ヺ一-龯々]/.test(name)
+
   // Compute term credits safely for all categories
   const computedCredits = useMemo(() => {
     const spring = { practical: 0, research: 0, lectures: 0 }
@@ -135,6 +151,34 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
 
   const totalSubtotal = totalPractical + totalResearch
   const grandTotal = totalSubtotal + totalLectures
+
+  const recommendationProgress = useMemo(() => {
+    const selectedTargetCode = normalizeTargetCode(selectedTarget)
+
+    let otherField = 0
+    let english = 0
+
+    for (const course of enrolledCourses) {
+      const credits = course.course_metadata[0]?.credits ?? 0
+
+      if (credits <= 0) continue
+
+      const hasOtherFieldTarget = course.course_targets.some(
+        (target) =>
+          normalizeTargetCode(target.target_code) !== selectedTargetCode
+      )
+
+      if (hasOtherFieldTarget) {
+        otherField += credits
+      }
+
+      if (isEnglishNamedCourse(course.name)) {
+        english += credits
+      }
+    }
+
+    return { otherField, english }
+  }, [enrolledCourses, selectedTarget])
 
   return (
     <div className="flex flex-col gap-2">
@@ -188,7 +232,9 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                       value={earnedPractical}
                       onChange={(e) => setEarnedPractical(e.target.value)}
                       className="h-7 w-16 bg-background text-center text-sm"
-                      aria-invalid={isNaN(Number(earnedPractical)) ? "true" : undefined}
+                      aria-invalid={
+                        isNaN(Number(earnedPractical)) ? "true" : undefined
+                      }
                     />
                   ) : (
                     basePractical.toFixed(1)
@@ -216,7 +262,9 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                       value={earnedResearch}
                       onChange={(e) => setEarnedResearch(e.target.value)}
                       className="h-7 w-16 bg-background text-center text-sm"
-                      aria-invalid={isNaN(Number(earnedResearch)) ? "true" : undefined}
+                      aria-invalid={
+                        isNaN(Number(earnedResearch)) ? "true" : undefined
+                      }
                     />
                   ) : (
                     baseResearch.toFixed(1)
@@ -265,7 +313,9 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                       value={earnedLectures}
                       onChange={(e) => setEarnedLectures(e.target.value)}
                       className="h-7 w-16 bg-background text-center text-sm"
-                      aria-invalid={isNaN(Number(earnedLectures)) ? "true" : undefined}
+                      aria-invalid={
+                        isNaN(Number(earnedLectures)) ? "true" : undefined
+                      }
                     />
                   ) : (
                     baseLectures.toFixed(1)
@@ -311,7 +361,14 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
             <span className="mt-0.5">•</span>
             <span>
               他領域から <strong className="text-foreground">4単位以上</strong>{" "}
-              修得することを推奨します。
+              修得することを推奨します
+              <span className="ml-1 text-foreground">
+                （現在{" "}
+                <strong className="text-foreground">
+                  {recommendationProgress.otherField.toFixed(1)}単位
+                </strong>
+                ）
+              </span>
             </span>
           </p>
           <p className="flex items-start gap-1">
@@ -319,17 +376,16 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
             <span>
               英語での開講科目から{" "}
               <strong className="text-foreground">2単位以上</strong>{" "}
-              修得することを推奨します。
+              修得することを推奨します
+              <span className="ml-1 text-foreground">
+                （現在{" "}
+                <strong className="text-foreground">
+                  {recommendationProgress.english.toFixed(1)}単位
+                </strong>
+                ）
+              </span>
             </span>
           </p>
-          {isNuclear && (
-            <p className="flex items-start gap-1 font-medium text-amber-600 dark:text-amber-500">
-              <span className="mt-0.5">•</span>
-              <span>
-                共同原子力専攻の要件（実習・演習2単位、小計10単位、授業科目20単位以上）が適用されています。
-              </span>
-            </p>
-          )}
         </div>
       </div>
     </div>

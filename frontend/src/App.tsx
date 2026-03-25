@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route } from "react-router"
+import { BrowserRouter, Navigate, Outlet, Routes, Route } from "react-router"
 import { Layout } from "@/components/layout/Layout"
 import { CoursesPage } from "@/pages/CoursesPage"
 import { TimetablePage } from "@/pages/TimetablePage"
 import { AdminPage } from "@/pages/AdminPage"
 import { ReviewPage } from "@/pages/ReviewPage"
 import { SettingsProvider } from "@/hooks/use-settings"
+import { useAuth } from "@/hooks/use-auth"
 
 export function App() {
   return (
@@ -14,13 +15,32 @@ export function App() {
           <Route element={<Layout />}>
             <Route index element={<CoursesPage />} />
             <Route path="timetable" element={<TimetablePage />} />
-            <Route path="admin" element={<AdminPage />} />
-            <Route path="admin/review/:extractionId" element={<ReviewPage />} />
+            <Route element={<AdminRoute />}>
+              <Route path="admin" element={<AdminPage />} />
+              <Route
+                path="admin/review/:extractionId"
+                element={<ReviewPage />}
+              />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>
     </SettingsProvider>
   )
+}
+
+function AdminRoute() {
+  const { user, isLoading } = useAuth()
+
+  if (isLoading) {
+    return null
+  }
+
+  if (user?.app_metadata?.role !== "admin") {
+    return <Navigate to="/" replace />
+  }
+
+  return <Outlet />
 }
 
 export default App

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import type { UserSettings, UserEnrollment } from "@/lib/database.types"
@@ -9,6 +9,8 @@ const LOCAL_ENROLLMENTS_KEY = "TIME_ENROLLMENTS"
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const currentUserIdRef = useRef<string | null>(null)
+  const isInitializedRef = useRef(false)
 
   const syncLocalData = async (authUser: User) => {
     // 1. Sync Settings
@@ -73,10 +75,12 @@ export function useAuth() {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+      currentUserIdRef.current = session?.user?.id ?? null
+      isInitializedRef.current = true
       setIsLoading(false)
       
       if (session?.user) {
-        syncLocalData(session.user)
+        void syncLocalData(session.user)
       }
     })
 
@@ -84,13 +88,26 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null)
-      
-      if (event === "SIGNED_IN" && session?.user) {
-        syncLocalData(session.user)
-      } else if (event === "SIGNED_OUT") {
-        // Option: clear local storage if you want strict logout cleanup. 
-        // We leave it to allow trying the app unauthenticated again.
+      const nextUser = session?.user ?? null
+      const previousUserId = currentUserIdRef.current
+      const nextUserId = nextUser?.id ?? null
+
+      currentUserIdRef.current = nextUserId
+      setUser(nextUser)
+
+      if (!isInitializedRef.current || previousUserId === nextUserId) {
+        return
+      }
+
+      if (event === "SIGNED_IN" && nextUser) {
+        void syncLocalData(nextUser).finally(() => {
+          window.location.reload()
+        })
+        return
+      }
+
+      if (event === "SIGNED_OUT") {
+        window.location.reload()
       }
     })
 
