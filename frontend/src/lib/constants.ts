@@ -1,6 +1,6 @@
 /** Target department codes from course_targets table */
 export const TARGETS = [
-  { code: "00", label: "共通" },
+  { code: "00", label: "共通 / 英語" },
   { code: "01", label: "機械(機械工学)" },
   { code: "02", label: "機械(機械システム工学)" },
   { code: "03", label: "電気・化学(電気電子工学)" },

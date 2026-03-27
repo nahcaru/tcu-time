@@ -41,6 +41,27 @@ export function useCourses(filters?: CourseFilters) {
       setIsLoading(true)
       setError(null)
 
+      const { data: latestCourse, error: latestErr } = await supabase
+        .from("courses")
+        .select("academic_year")
+        .order("academic_year", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (latestErr) {
+        setError(new Error(latestErr.message))
+        setIsLoading(false)
+        return
+      }
+
+      if (!latestCourse) {
+        setAllCourses([])
+        setIsLoading(false)
+        return
+      }
+
       const { data, error: err } = await supabase
         .from("courses")
         .select(
@@ -51,6 +72,7 @@ export function useCourses(filters?: CourseFilters) {
           course_metadata (*)
         `
         )
+        .eq("academic_year", latestCourse.academic_year)
         .order("code")
 
       if (cancelled) return

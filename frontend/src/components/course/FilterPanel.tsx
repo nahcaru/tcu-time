@@ -219,6 +219,22 @@ export function FilterContent({
             ))}
           </div>
         </div>
+
+        <div className="space-y-2">
+          <h5 className="py-1 text-xs font-medium">その他</h5>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="term-通年"
+                checked={selectedTerms.includes("通年")}
+                onCheckedChange={() => toggleTerm("通年")}
+              />
+              <label htmlFor="term-通年" className="text-sm">
+                通年
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 対象 */}

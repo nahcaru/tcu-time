@@ -14,8 +14,14 @@ import type { Json } from "@/lib/database.types"
 
 export const VALID_DAYS = ["月", "火", "水", "木", "金", "土"] as const
 export const VALID_TERMS = [
-  "前期前", "前期後", "前期", "前集中",
-  "後期前", "後期後", "後期", "後集中",
+  "前期前",
+  "前期後",
+  "前期",
+  "前集中",
+  "後期前",
+  "後期後",
+  "後期",
+  "後集中",
   "通年",
 ] as const
 export const VALID_PERIODS = [1, 2, 3, 4, 5] as const
@@ -97,7 +103,7 @@ export type ExtractionRawJson =
 
 async function applyTimetableApproval(
   extractionId: string,
-  raw: TimetableRawJson,
+  raw: TimetableRawJson
 ): Promise<number> {
   const { courses = [], academic_year, is_tentative = false, semester } = raw
 
@@ -127,8 +133,10 @@ async function applyTimetableApproval(
           extraction_id: extractionId,
           status: "active",
           source_type: "timetable",
+          term: course.term,
+          room: course.room,
         },
-        { onConflict: "code,academic_year" },
+        { onConflict: "code,academic_year" }
       )
       .select("id")
       .single()
@@ -146,11 +154,9 @@ async function applyTimetableApproval(
       await supabase.from("schedules").insert(
         course.schedules.map((s) => ({
           course_id: courseId,
-          term: course.term ?? "",
           day: s.day,
           period: s.period,
-          room: course.room ?? "",
-        })),
+        }))
       )
     }
 
@@ -163,7 +169,7 @@ async function applyTimetableApproval(
           target_code: t.target_code,
           target_name: t.target_name,
           note: t.note ?? "",
-        })),
+        }))
       )
     }
 
@@ -179,7 +185,7 @@ async function applyTimetableApproval(
 
 async function applyChangelogApproval(
   extractionId: string,
-  raw: ChangelogRawJson,
+  raw: ChangelogRawJson
 ): Promise<number> {
   const { changes = [], academic_year } = raw
   let count = 0
@@ -198,10 +204,13 @@ async function applyChangelogApproval(
           source_type: "changelog",
           extraction_id: extractionId,
         },
-        { onConflict: "code,academic_year" },
+        { onConflict: "code,academic_year" }
       )
       count++
-    } else if (change.change_type === "update" || change.change_type === "delete") {
+    } else if (
+      change.change_type === "update" ||
+      change.change_type === "delete"
+    ) {
       let query = supabase.from("courses").select("id").eq("status", "active")
       if (academic_year) query = query.eq("academic_year", academic_year)
       if (change.course_code) {
@@ -216,7 +225,10 @@ async function applyChangelogApproval(
       if (!found) continue
 
       if (change.change_type === "delete") {
-        await supabase.from("courses").update({ status: "cancelled" }).eq("id", found.id)
+        await supabase
+          .from("courses")
+          .update({ status: "cancelled" })
+          .eq("id", found.id)
       } else {
         const updates: Record<string, unknown> = {}
         for (const fc of change.changes ?? []) {
@@ -239,7 +251,7 @@ async function applyChangelogApproval(
 
 async function applyAdvanceApproval(
   _extractionId: string,
-  raw: AdvanceRawJson,
+  raw: AdvanceRawJson
 ): Promise<number> {
   const { names = [], academic_year } = raw
   const year = academic_year ?? new Date().getFullYear()
@@ -262,7 +274,10 @@ async function applyAdvanceApproval(
       .single()
 
     if (found) {
-      await supabase.from("courses").update({ advance_enrollment: true }).eq("id", found.id)
+      await supabase
+        .from("courses")
+        .update({ advance_enrollment: true })
+        .eq("id", found.id)
       count++
     }
   }
@@ -277,7 +292,7 @@ async function applyAdvanceApproval(
 export async function approveExtraction(
   extractionId: string,
   pdfType: string,
-  editedRawJson: ExtractionRawJson,
+  editedRawJson: ExtractionRawJson
 ): Promise<{ ok: boolean; count: number; error?: string }> {
   try {
     const { error: saveErr } = await supabase
@@ -292,11 +307,20 @@ export async function approveExtraction(
 
     let count = 0
     if (pdfType === "timetable") {
-      count = await applyTimetableApproval(extractionId, editedRawJson as TimetableRawJson)
+      count = await applyTimetableApproval(
+        extractionId,
+        editedRawJson as TimetableRawJson
+      )
     } else if (pdfType === "changelog") {
-      count = await applyChangelogApproval(extractionId, editedRawJson as ChangelogRawJson)
+      count = await applyChangelogApproval(
+        extractionId,
+        editedRawJson as ChangelogRawJson
+      )
     } else if (pdfType === "advance_enrollment") {
-      count = await applyAdvanceApproval(extractionId, editedRawJson as AdvanceRawJson)
+      count = await applyAdvanceApproval(
+        extractionId,
+        editedRawJson as AdvanceRawJson
+      )
     }
 
     const { error: statusErr } = await supabase

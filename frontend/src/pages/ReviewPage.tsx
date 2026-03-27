@@ -635,7 +635,11 @@ export function ReviewPage() {
   }
 
   const handleApprove = async () => {
-    if (!extraction || !editedJson || !allChecked) return
+    if (!extraction || !editedJson) return
+
+    const status = extraction.status ?? "pending"
+    if (status === "extracted" && !allChecked) return
+
     setActing(true)
 
     const result = await approveExtraction(extraction.id, pdfType, editedJson)
@@ -643,7 +647,7 @@ export function ReviewPage() {
     if (!result.ok) {
       showToast("承認に失敗しました: " + result.error)
     } else {
-      showToast(`承認完了 — ${result.count} 件を反映しました`)
+      showToast(`${status === "approved" ? "再反映完了" : "承認完了"} — ${result.count} 件を反映しました`)
       setTimeout(() => navigate("/admin"), 1200)
     }
     setActing(false)
@@ -670,7 +674,9 @@ export function ReviewPage() {
 
   const status = extraction.status ?? "pending"
   const badge = STATUS_LABELS[status] ?? { label: status, color: "bg-muted text-muted-foreground" }
-  const isReviewable = status === "extracted"
+  const isReviewable = status === "extracted" || status === "approved"
+  const requiresChecklist = status === "extracted"
+  const canSubmit = !acting && (!requiresChecklist || allChecked)
 
   const title = `${PDF_TYPE_LABELS[pdfType] ?? pdfType}${
     extraction.semester === "spring" ? "（前期）" : extraction.semester === "fall" ? "（後期）" : ""
@@ -699,23 +705,27 @@ export function ReviewPage() {
           {/* Approve button */}
           {isReviewable && (
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={toggleAll}
-                className="text-xs text-muted-foreground hover:text-foreground hidden md:block"
-              >
-                {allChecked ? "全選択解除" : "全選択"}
-              </button>
-              <span className="text-xs text-muted-foreground hidden sm:block">
-                {checkedSet.size}/{itemCount}
-              </span>
+              {requiresChecklist && (
+                <>
+                  <button
+                    type="button"
+                    onClick={toggleAll}
+                    className="text-xs text-muted-foreground hover:text-foreground hidden md:block"
+                  >
+                    {allChecked ? "全選択解除" : "全選択"}
+                  </button>
+                  <span className="text-xs text-muted-foreground hidden sm:block">
+                    {checkedSet.size}/{itemCount}
+                  </span>
+                </>
+              )}
               <button
                 onClick={handleApprove}
-                disabled={acting || !allChecked}
+                disabled={!canSubmit}
                 className="h-8 md:h-9 px-3 md:px-4 rounded-md bg-primary text-primary-foreground text-xs md:text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                title={allChecked ? "" : "すべての項目にチェックを入れてください"}
+                title={requiresChecklist && !allChecked ? "すべての項目にチェックを入れてください" : ""}
               >
-                {acting ? "処理中…" : "承認して反映"}
+                {acting ? "処理中…" : status === "approved" ? "再反映して更新" : "承認して反映"}
               </button>
             </div>
           )}
