@@ -14,12 +14,14 @@ interface SearchBarProps {
   value: string
   onChange: (value: string) => void
   suggestions?: string[]
+  id?: string
 }
 
 export function SearchBar({
   value,
   onChange,
   suggestions = [],
+  id,
 }: SearchBarProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -55,7 +57,7 @@ export function SearchBar({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-sm">
+    <div ref={containerRef} className="relative w-full max-w-sm" id={id}>
       <Command
         shouldFilter={false}
         className="overflow-visible bg-transparent p-0"

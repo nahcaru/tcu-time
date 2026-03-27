@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { IconLogout, IconTrash, IconSettings } from "@tabler/icons-react"
@@ -21,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { supabase } from "@/lib/supabase"
 
 interface ProfileDialogProps {
   open: boolean
@@ -30,6 +32,8 @@ interface ProfileDialogProps {
 export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const handleSignOut = async () => {
     await signOut()
@@ -39,6 +43,26 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const handleAdminNavigate = () => {
     onOpenChange(false)
     navigate("/admin")
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!user || deleteLoading) return
+
+    setDeleteLoading(true)
+    setDeleteError(null)
+
+    const { error } = await supabase.functions.invoke("delete-account")
+
+    if (error) {
+      setDeleteError(error.message)
+      setDeleteLoading(false)
+      return
+    }
+
+    await signOut()
+    onOpenChange(false)
+    navigate("/")
+    setDeleteLoading(false)
   }
 
   const displayName =
@@ -132,12 +156,21 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                   </AlertDialogHeader>
                   <AlertDialogFooter className="gap-2 sm:gap-0">
                     <AlertDialogCancel size="sm">キャンセル</AlertDialogCancel>
-                    <AlertDialogAction className="text-destructive-foreground h-9 bg-destructive text-sm hover:bg-destructive/90">
-                      削除する
+                    <AlertDialogAction
+                      className="text-destructive-foreground h-9 bg-destructive text-sm hover:bg-destructive/90"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        void handleDeleteAccount()
+                      }}
+                    >
+                      {deleteLoading ? "削除中..." : "削除する"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              {deleteError && (
+                <p className="mt-2 text-xs text-destructive">{deleteError}</p>
+              )}
             </div>
           </div>
         </div>

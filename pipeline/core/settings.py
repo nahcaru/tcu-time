@@ -16,10 +16,13 @@ class Settings:
     GEMINI_FALLBACK_MODEL: str = "gemini-3.1-flash-lite-preview"
 
     @classmethod
-    def validate(cls) -> None:
+    def validate(cls, required: tuple[str, ...] | None = None) -> None:
+        if required is None:
+            required = ("SUPABASE_URL", "SUPABASE_KEY", "GEMINI_API_KEY")
+
         missing = [
             name
-            for name in ("SUPABASE_URL", "SUPABASE_KEY", "GEMINI_API_KEY")
+            for name in required
             if not getattr(cls, name)
         ]
         if missing:

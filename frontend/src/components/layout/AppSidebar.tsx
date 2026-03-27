@@ -18,9 +18,11 @@ import {
   IconSun,
   IconMoon,
   IconLogin,
+  IconHelp,
 } from "@tabler/icons-react"
 import { useTheme } from "@/components/theme-provider"
 import { useAuth } from "@/hooks/use-auth"
+import { useTutorial } from "@/hooks/use-tutorial"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LoginDialog } from "@/components/auth/LoginDialog"
 import { ProfileDialog } from "@/components/auth/ProfileDialog"
@@ -43,6 +45,11 @@ export function AppSidebar() {
   const location = useLocation()
   const { theme, resolvedTheme, setTheme } = useTheme()
   const { user } = useAuth()
+  const { resetAndStartTour } = useTutorial()
+
+  // マッピング: pathname → tutorial page key
+  const tutorialPageKey =
+    location.pathname === "/timetable" ? "timetable" : "courses"
 
   const [loginOpen, setLoginOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -99,6 +106,16 @@ export function AppSidebar() {
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => resetAndStartTour(tutorialPageKey)}
+                tooltip="使い方"
+              >
+                <IconHelp />
+                <span>使い方</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
             <SidebarMenuItem>
               <SidebarMenuButton
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

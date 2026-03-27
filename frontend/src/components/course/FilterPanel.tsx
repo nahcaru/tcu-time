@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { TARGETS, SPRING_TERMS, FALL_TERMS } from "@/lib/constants"
 
 interface FilterPanelProps {
+  id?: string
   selectedTargets: string[]
   selectedTerms: string[]
   enrolledOnly: boolean
@@ -288,7 +289,12 @@ export function FilterPanel(props: FilterPanelProps) {
   return (
     <Drawer>
       <DrawerTrigger asChild>
-        <Button variant="outline" size="icon" className="shrink-0">
+        <Button
+          variant="outline"
+          size="icon"
+          className="shrink-0"
+          id={props.id}
+        >
           <IconFilter className="h-4 w-4" />
           <span className="sr-only">フィルター</span>
         </Button>

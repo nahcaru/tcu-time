@@ -8,8 +8,12 @@ import { useEnrollments } from "@/hooks/use-enrollments"
 import { IconLoader2 } from "@tabler/icons-react"
 import type { CourseWithRelations } from "@/lib/database.types"
 import { PageHeader } from "@/components/layout/PageHeader"
+import { usePageTutorial } from "@/hooks/use-page-tutorial"
 
 export function CoursesPage() {
+  // Tutorial
+  usePageTutorial("courses")
+
   // Filter state
   const [selectedTargets, setSelectedTargets] = useState<string[]>([])
   const [selectedTerms, setSelectedTerms] = useState<string[]>([])
@@ -82,25 +86,32 @@ export function CoursesPage() {
         <div className="flex w-full items-center gap-4">
           <div className="flex flex-1 justify-center">
             <SearchBar
+              id="tutorial-search"
               value={search}
               onChange={setSearch}
               suggestions={suggestions}
             />
           </div>
           <div className="lg:hidden">
-            <FilterPanel {...filterProps} />
+            <FilterPanel id="tutorial-filter-mobile" {...filterProps} />
           </div>
         </div>
       </PageHeader>
 
       <div className="flex min-h-0 flex-1 flex-col pt-14 md:flex-row md:pt-0">
-        <div className="no-scrollbar hidden h-full w-64 shrink-0 overflow-y-auto border-r p-4 lg:block">
+        <div
+          className="no-scrollbar hidden h-full w-64 shrink-0 overflow-y-auto border-r p-4 lg:block"
+          id="tutorial-filter"
+        >
           <h3 className="mb-2 font-semibold">フィルター</h3>
           <FilterContent {...filterProps} />
         </div>
 
         {/* Main Content Area */}
-        <div className="min-w-0 flex-1 px-2 py-4 md:px-6 lg:overflow-y-auto">
+        <div
+          className="min-w-0 flex-1 px-2 py-4 md:px-6 lg:overflow-y-auto"
+          id="tutorial-course-list"
+        >
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />

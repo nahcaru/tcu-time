@@ -19,7 +19,7 @@ def now_iso() -> str:
 def get_client() -> Client:
     global _client
     if _client is None:
-        Settings.validate()
+        Settings.validate(required=("SUPABASE_URL", "SUPABASE_KEY"))
         _client = create_client(Settings.SUPABASE_URL, Settings.SUPABASE_KEY)
     return _client
 
