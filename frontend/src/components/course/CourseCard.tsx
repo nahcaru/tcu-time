@@ -42,7 +42,7 @@ export function CourseCard({
         </div>
 
         {/* Right column (desktop) / Bottom part (mobile) */}
-        <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-1">
+        <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
           <a
             href={syllabusUrl(course.academic_year.toString(), course.code)}
             target="_blank"

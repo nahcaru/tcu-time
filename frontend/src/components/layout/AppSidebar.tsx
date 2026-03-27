@@ -41,7 +41,7 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar()
   const location = useLocation()
-  const { theme, setTheme } = useTheme()
+  const { theme, resolvedTheme, setTheme } = useTheme()
   const { user } = useAuth()
 
   const [loginOpen, setLoginOpen] = useState(false)
@@ -59,7 +59,20 @@ export function AppSidebar() {
     <>
       <Sidebar collapsible="icon" variant="inset" className="dark">
         <SidebarHeader className="h-14 items-center justify-center border-b text-xl font-bold">
-          {state === "collapsed" ? "TIME" : "TCU-TIME"}
+          <div className="flex items-center gap-2">
+            <img
+              className="h-8 w-8"
+              src={
+                resolvedTheme === "dark"
+                  ? "/time-icon-dark.png"
+                  : "/time-icon.png"
+              }
+              alt="TCU-TIME"
+              width={32}
+              height={32}
+            />
+            {state === "expanded" && "TCU-TIME"}
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
@@ -71,9 +84,10 @@ export function AppSidebar() {
                       asChild
                       isActive={location.pathname === item.url}
                       tooltip={item.title}
+                      size="lg"
                     >
                       <Link to={item.url}>
-                        <item.icon />
+                        <item.icon className="size-6!" />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>

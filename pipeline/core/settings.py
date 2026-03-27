@@ -8,7 +8,7 @@ class Settings:
     SUPABASE_KEY: str = os.environ.get("SUPABASE_KEY", "")
     GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 
-    TARGET_URL: str = "https://www.asc.tcu.ac.jp/6509/"
+    TARGET_URL: str = "https://www.asc.tcu.ac.jp/7567/"
     SYLLABUS_BASE_URL: str = "https://websrv.tcu.ac.jp/tcu_web_v3"
 
     SCRAPE_DELAY_SEC: float = 3.0

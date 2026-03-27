@@ -13,11 +13,27 @@ type ThemeProviderProps = {
 
 type ThemeProviderState = {
   theme: Theme
+  resolvedTheme: ResolvedTheme
   setTheme: (theme: Theme) => void
 }
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
 const THEME_VALUES: Theme[] = ["dark", "light", "system"]
+const FAVICON_ID = "app-favicon"
+
+function getThemeIconPath(theme: ResolvedTheme) {
+  return theme === "dark" ? "/time-icon-dark.png" : "/time-icon.png"
+}
+
+function updateFavicon(theme: ResolvedTheme) {
+  const favicon = document.getElementById(FAVICON_ID)
+
+  if (!(favicon instanceof HTMLLinkElement)) {
+    return
+  }
+
+  favicon.href = getThemeIconPath(theme)
+}
 
 const ThemeProviderContext = React.createContext<
   ThemeProviderState | undefined
@@ -92,6 +108,8 @@ export function ThemeProvider({
 
     return defaultTheme
   })
+  const [resolvedTheme, setResolvedTheme] =
+    React.useState<ResolvedTheme>("light")
 
   const setTheme = React.useCallback(
     (nextTheme: Theme) => {
@@ -112,6 +130,8 @@ export function ThemeProvider({
 
       root.classList.remove("light", "dark")
       root.classList.add(resolvedTheme)
+      setResolvedTheme(resolvedTheme)
+      updateFavicon(resolvedTheme)
 
       if (restoreTransitions) {
         restoreTransitions()
@@ -207,9 +227,10 @@ export function ThemeProvider({
   const value = React.useMemo(
     () => ({
       theme,
+      resolvedTheme,
       setTheme,
     }),
-    [theme, setTheme]
+    [theme, resolvedTheme, setTheme]
   )
 
   return (

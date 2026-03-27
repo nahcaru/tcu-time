@@ -38,8 +38,9 @@ export function CourseGrid({
     const map = new Map<string, CourseWithRelations[]>()
 
     for (const course of enrolledCourses) {
+      if (!course.term || !terms.includes(course.term)) continue
+
       for (const schedule of course.schedules) {
-        if (!terms.includes(schedule.term)) continue
         const key = `${schedule.day}-${schedule.period}`
         const existing = map.get(key) ?? []
         // Avoid duplicates (same course, different schedule entries)
@@ -99,7 +100,7 @@ export function CourseGrid({
 
                 if (courses.length === 1) {
                   state = "single"
-                  name = courses[0].name
+                  name = courses[0].name ?? ""
                 } else if (courses.length > 1) {
                   state = "conflict"
                 }
