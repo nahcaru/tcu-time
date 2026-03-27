@@ -9,11 +9,14 @@ import { useEnrollments } from "@/hooks/use-enrollments"
 import { SPRING_TERMS, FALL_TERMS } from "@/lib/constants"
 import type { CourseWithRelations } from "@/lib/database.types"
 import { PageHeader } from "@/components/layout/PageHeader"
+import { usePageTutorial } from "@/hooks/use-page-tutorial"
 
 export function TimetablePage() {
   const { enrolledCourseIds, addEnrollment, removeEnrollment } =
     useEnrollments()
   const { courses: allCourses } = useCourses()
+
+  usePageTutorial("timetable")
 
   // Filter to only enrolled courses
   const enrolledCourses = useMemo(
@@ -39,7 +42,7 @@ export function TimetablePage() {
       className="relative flex min-h-full flex-col pb-6"
     >
       <PageHeader title="時間割">
-        <TabsList className="w-full">
+        <TabsList className="w-full" id="tutorial-tabs">
           <TabsTrigger value="spring">前期</TabsTrigger>
           <TabsTrigger value="fall">後期</TabsTrigger>
         </TabsList>
@@ -109,14 +112,16 @@ function SemesterContent({
     <div className="flex flex-col gap-6">
       <TimeSlots />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <CourseGrid
-          title="前半"
-          terms={firstHalfTerms}
-          enrolledCourses={regularCourses}
-          addEnrollment={addEnrollment}
-          removeEnrollment={removeEnrollment}
-          enrolledCourseIds={enrolledCourseIds}
-        />
+        <div id="tutorial-grid">
+          <CourseGrid
+            title="前半"
+            terms={firstHalfTerms}
+            enrolledCourses={regularCourses}
+            addEnrollment={addEnrollment}
+            removeEnrollment={removeEnrollment}
+            enrolledCourseIds={enrolledCourseIds}
+          />
+        </div>
         <CourseGrid
           title="後半"
           terms={secondHalfTerms}
@@ -132,7 +137,9 @@ function SemesterContent({
           removeEnrollment={removeEnrollment}
           enrolledCourseIds={enrolledCourseIds}
         />
-        <CreditsTable termType={termType} enrolledCourses={enrolledCourses} />
+        <div id="tutorial-credits">
+          <CreditsTable termType={termType} enrolledCourses={enrolledCourses} />
+        </div>
       </div>
     </div>
   )

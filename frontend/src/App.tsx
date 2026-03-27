@@ -5,11 +5,13 @@ import { TimetablePage } from "@/pages/TimetablePage"
 import { AdminPage } from "@/pages/AdminPage"
 import { ReviewPage } from "@/pages/ReviewPage"
 import { SettingsProvider } from "@/hooks/use-settings"
+import { TutorialProvider } from "@/hooks/use-tutorial"
 import { useAuth } from "@/hooks/use-auth"
 
 export function App() {
   return (
     <SettingsProvider>
+      <TutorialProvider>
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -25,6 +27,7 @@ export function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      </TutorialProvider>
     </SettingsProvider>
   )
 }
