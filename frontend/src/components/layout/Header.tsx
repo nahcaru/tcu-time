@@ -56,7 +56,7 @@ export function Header() {
           {user ? (
             <Button
               variant="ghost"
-              className="h-8 w-8 rounded-full p-0"
+              size="icon"
               onClick={() => setProfileOpen(true)}
             >
               <Avatar className="h-8 w-8 border">

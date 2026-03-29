@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { FunctionsHttpError } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { IconLogout, IconTrash, IconSettings } from "@tabler/icons-react"
@@ -29,6 +30,22 @@ interface ProfileDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+async function getDeleteErrorMessage(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json()
+      if (body?.error === "unauthorized") return "認証エラーです。再ログインしてください。"
+      if (body?.error === "delete_failed") return "アカウント削除に失敗しました。"
+      if (body?.error === "server_error") return "サーバーエラーが発生しました。"
+    } catch {
+      return "アカウント削除に失敗しました。"
+    }
+  }
+
+  if (error instanceof Error) return error.message
+  return "アカウント削除に失敗しました。"
+}
+
 export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
@@ -54,7 +71,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
     const { error } = await supabase.functions.invoke("delete-account")
 
     if (error) {
-      setDeleteError(error.message)
+      setDeleteError(await getDeleteErrorMessage(error))
       setDeleteLoading(false)
       return
     }

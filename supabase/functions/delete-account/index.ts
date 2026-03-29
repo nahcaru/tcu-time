@@ -1,72 +1,63 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+};
+function jsonResponse(body, status) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json"
+    }
+  });
 }
-
-Deno.serve(async (req) => {
+Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+    return new Response("ok", {
+      headers: corsHeaders
+    });
   }
-
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-    const authHeader = req.headers.get("Authorization")
-
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const authHeader = req.headers.get("Authorization");
     if (!supabaseUrl || !serviceRoleKey) {
-      return new Response(
-        JSON.stringify({ error: "Missing Supabase environment variables" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      )
+      return jsonResponse({
+        error: "server_error"
+      }, 500);
     }
-
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      })
+      return jsonResponse({
+        error: "unauthorized"
+      }, 401);
     }
-
-    const authClient = createClient(supabaseUrl, serviceRoleKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
-
-    const {
-      data: { user },
-      error: userError,
-    } = await authClient.auth.getUser()
-
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const jwt = authHeader.split(" ")[1];
+    if (!jwt) {
+      return jsonResponse({
+        error: "unauthorized"
+      }, 401);
+    }
+    const { data: { user }, error: userError } = await adminClient.auth.getUser(jwt);
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      })
+      return jsonResponse({
+        error: "unauthorized"
+      }, 401);
     }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey)
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id)
-
+    const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id);
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      })
+      return jsonResponse({
+        error: "delete_failed"
+      }, 500);
     }
-
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+    return jsonResponse({
+      ok: true
+    }, 200);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected error"
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+    console.error("delete-account failed", error);
+    return jsonResponse({
+      error: "server_error"
+    }, 500);
   }
-})
+});
