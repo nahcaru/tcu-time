@@ -92,7 +92,7 @@ export function CourseDialog({
         <DialogFooter className="flex-row">
           <Button variant="outline" size="sm" asChild>
             <a
-              href={syllabusUrl("2025", course.code)}
+              href={syllabusUrl(course.academic_year.toString(), course.code)}
               target="_blank"
               rel="noopener noreferrer"
               className="gap-1"
