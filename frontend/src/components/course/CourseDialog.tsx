@@ -74,7 +74,7 @@ export function CourseDialog({
           )}
           {targetItems.length > 0 && (
             <Row
-              label="受講対象"
+              label="対象"
               value={
                 <div className="flex flex-col">
                   {targetItems.map((item, i) => (
