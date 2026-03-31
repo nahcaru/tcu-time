@@ -5,7 +5,7 @@ import { AddCourseDialog } from "./AddCourseDialog"
 import { CourseDialog } from "@/components/course/CourseDialog"
 
 interface IntensiveCoursesProps {
-  /** Enrolled courses that have 集中 schedule entries */
+  /** Enrolled courses that have 集中 or 通年 schedule entries */
   courses: CourseWithRelations[]
   /** Terms for the semester */
   terms: string[]
@@ -22,9 +22,8 @@ export function IntensiveCourses({
   enrolledCourseIds,
 }: IntensiveCoursesProps) {
   const [isAddOpen, setIsAddOpen] = useState(false)
-  const [selectedCourse, setSelectedCourse] = useState<CourseWithRelations | null>(
-    null
-  )
+  const [selectedCourse, setSelectedCourse] =
+    useState<CourseWithRelations | null>(null)
 
   const handleToggleEnrollSingle = async (courseId: string) => {
     if (enrolledCourseIds.has(courseId)) {
@@ -37,7 +36,7 @@ export function IntensiveCourses({
   return (
     <div className="flex h-full flex-col gap-2">
       <h3 className="px-1 text-sm font-semibold text-muted-foreground">
-        集中科目
+        集中・通年
       </h3>
       <div className="flex flex-1 flex-col rounded-md border bg-card p-2">
         <div className="flex flex-col gap-2">
@@ -49,11 +48,8 @@ export function IntensiveCourses({
               onClick={() => setSelectedCourse(course)}
             />
           ))}
-          
-          <GridCell
-            state="empty"
-            onClick={() => setIsAddOpen(true)}
-          />
+
+          <GridCell state="empty" onClick={() => setIsAddOpen(true)} />
         </div>
       </div>
 

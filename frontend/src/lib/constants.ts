@@ -26,6 +26,7 @@ export const TERMS = [
   "後期後",
   "後期",
   "後集中",
+  "通年",
 ] as const
 
 export type Term = (typeof TERMS)[number]
@@ -43,19 +44,26 @@ export const PERIODS = [1, 2, 3, 4, 5] as const
 
 /** Period time ranges */
 export const PERIOD_TIMES: Record<number, string> = {
-  1: "9:20-11:00",
-  2: "11:10-12:50",
-  3: "13:40-15:20",
-  4: "15:30-17:10",
-  5: "17:20-19:00",
+  1: "9:20~11:00",
+  2: "11:10~12:50",
+  3: "13:40~15:20",
+  4: "15:30~17:10",
+  5: "17:20~19:00",
 }
 
 export const PERIOD_TIMES_NUCLEAR: Record<number, string> = {
-  1: "8:50-10:30",
-  2: "10:40-12:20",
-  3: "13:10-14:50",
-  4: "15:05-16:45",
-  5: "17:00-18:40",
+  1: "8:50~10:30",
+  2: "10:40~12:20",
+  3: "13:10~14:50",
+  4: "15:05~16:45",
+  5: "17:00~18:40",
+}
+
+export const QUARTER_PERIODS: Record<number, string> = {
+  1: "4/10~6/3",
+  2: "6/8~7/25",
+  3: "9/24~11/17",
+  4: "11/21~1/25",
 }
 
 /**

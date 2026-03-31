@@ -63,7 +63,7 @@ export function AddCourseDialog({
   const slotCourses = useMemo(() => {
     if (day === "集中") {
       return courses.filter((c) =>
-        c.term != null && c.term.includes("集中")
+        c.term != null && (c.term.includes("集中") || c.term === "通年")
       )
     }
     if (!day || !period) return []
@@ -108,7 +108,7 @@ export function AddCourseDialog({
         <DialogHeader>
           <DialogTitle className="text-lg">
             {day === "集中"
-              ? "集中科目の登録"
+              ? "集中・通年科目の登録"
               : `${day}曜 ${period}限の科目登録`}
           </DialogTitle>
         </DialogHeader>

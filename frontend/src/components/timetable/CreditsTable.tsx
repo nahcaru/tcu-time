@@ -116,6 +116,7 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
 
       const hasSpring = course.term?.startsWith("前") ?? false
       const hasFall = course.term?.startsWith("後") ?? false
+      const isAnnual = course.term === "通年"
 
       // Define bucket based on category
       let bucket: "practical" | "research" | "lectures" = "lectures"
@@ -124,6 +125,7 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
 
       if (hasSpring) spring[bucket] += credits
       if (hasFall) fall[bucket] += credits
+      if (isAnnual) fall[bucket] += credits
     }
     return { spring, fall }
   }, [enrolledCourses])
@@ -210,7 +212,7 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                   {isSpring ? "修得済" : "修得済+前期"}
                 </TableHead>
                 <TableHead className="w-1/5 text-right whitespace-nowrap">
-                  {termType}
+                  {isSpring ? "前期" : "後期+通年"}
                 </TableHead>
                 <TableHead className="w-1/5 bg-muted/10 text-right font-bold whitespace-nowrap text-foreground">
                   合計
