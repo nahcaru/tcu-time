@@ -6,7 +6,7 @@ import { IntensiveCourses } from "@/components/timetable/IntensiveCourses"
 import { CreditsTable } from "@/components/timetable/CreditsTable"
 import { useCourses } from "@/hooks/use-courses"
 import { useEnrollments } from "@/hooks/use-enrollments"
-import { SPRING_TERMS, FALL_TERMS } from "@/lib/constants"
+import { SPRING_TERMS, FALL_TERMS, QUARTER_PERIODS } from "@/lib/constants"
 import type { CourseWithRelations } from "@/lib/database.types"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { usePageTutorial } from "@/hooks/use-page-tutorial"
@@ -27,7 +27,10 @@ export function TimetablePage() {
   // Intensive courses = those with 集中 in their term
   const intensiveCourses = (terms: readonly string[]) =>
     enrolledCourses.filter(
-      (c) => c.term != null && terms.includes(c.term) && c.term.includes("集中")
+      (c) =>
+        c.term != null &&
+        (terms.includes(c.term) || c.term === "通年") &&
+        (c.term.includes("集中") || c.term === "通年")
     )
 
   // Regular (non-intensive) enrolled courses for grid display
@@ -115,7 +118,7 @@ function SemesterContent({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div id="tutorial-grid">
           <CourseGrid
-            title="前半"
+            title={`前半（${termType === "前期" ? "1" : "3"}Q）${QUARTER_PERIODS[termType === "前期" ? 1 : 3]}`}
             terms={firstHalfTerms}
             enrolledCourses={regularCourses}
             addEnrollment={addEnrollment}
@@ -124,7 +127,7 @@ function SemesterContent({
           />
         </div>
         <CourseGrid
-          title="後半"
+          title={`後半（${termType === "前期" ? "2" : "4"}Q）${QUARTER_PERIODS[termType === "前期" ? 2 : 4]}`}
           terms={secondHalfTerms}
           enrolledCourses={regularCourses}
           addEnrollment={addEnrollment}
@@ -133,7 +136,7 @@ function SemesterContent({
         />
         <IntensiveCourses
           courses={intensiveCourses}
-          terms={termType === "前期" ? ["前集中"] : ["後集中"]}
+          terms={termType === "前期" ? ["前集中", "通年"] : ["後集中", "通年"]}
           addEnrollment={addEnrollment}
           removeEnrollment={removeEnrollment}
           enrolledCourseIds={enrolledCourseIds}
