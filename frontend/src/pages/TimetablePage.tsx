@@ -26,14 +26,15 @@ export function TimetablePage() {
 
   // Intensive courses = those with 集中 in their term
   const intensiveCourses = (terms: readonly string[]) =>
-    enrolledCourses.filter((c) =>
-      c.term != null && terms.includes(c.term) && c.term.includes("集中")
+    enrolledCourses.filter(
+      (c) => c.term != null && terms.includes(c.term) && c.term.includes("集中")
     )
 
   // Regular (non-intensive) enrolled courses for grid display
   const regularCourses = (terms: readonly string[]) =>
-    enrolledCourses.filter((c) =>
-      c.term != null && terms.includes(c.term) && !c.term.includes("集中")
+    enrolledCourses.filter(
+      (c) =>
+        c.term != null && terms.includes(c.term) && !c.term.includes("集中")
     )
 
   return (
@@ -111,7 +112,7 @@ function SemesterContent({
   return (
     <div className="flex flex-col gap-6">
       <TimeSlots />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div id="tutorial-grid">
           <CourseGrid
             title="前半"
