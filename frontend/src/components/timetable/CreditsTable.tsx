@@ -237,14 +237,14 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                       }
                     />
                   ) : (
-                    basePractical.toFixed(1)
+                    String(basePractical)
                   )}
                 </TableCell>
-                <TableCell className="text-right text-sm font-medium">
-                  {currentTermCredits.practical.toFixed(1)}
+                <TableCell className="text-right text-sm font-medium text-muted-foreground">
+                  {String(currentTermCredits.practical)}
                 </TableCell>
-                <TableCell className="bg-primary/5 text-right font-semibold text-primary">
-                  {totalPractical.toFixed(1)}
+                <TableCell className="bg-primary/10 text-right font-semibold text-muted-foreground">
+                  {String(totalPractical)}
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">
                   {reqPractical}
@@ -267,14 +267,14 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                       }
                     />
                   ) : (
-                    baseResearch.toFixed(1)
+                    String(baseResearch)
                   )}
                 </TableCell>
-                <TableCell className="text-right text-sm font-medium">
-                  {currentTermCredits.research.toFixed(1)}
+                <TableCell className="text-right text-sm font-medium text-muted-foreground">
+                  {String(currentTermCredits.research)}
                 </TableCell>
-                <TableCell className="bg-primary/5 text-right font-semibold text-primary">
-                  {totalResearch.toFixed(1)}
+                <TableCell className="bg-primary/10 text-right font-semibold text-muted-foreground">
+                  {String(totalResearch)}
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">
                   {reqResearch}
@@ -283,19 +283,17 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
 
               {/* 小計 */}
               <TableRow className="bg-muted/30">
-                <TableCell className="font-semibold text-muted-foreground">
-                  小計
+                <TableCell className="font-semibold">小計</TableCell>
+                <TableCell className="text-right text-sm font-medium">
+                  {String(basePractical + baseResearch)}
                 </TableCell>
                 <TableCell className="text-right text-sm font-medium">
-                  {(basePractical + baseResearch).toFixed(1)}
-                </TableCell>
-                <TableCell className="text-right text-sm font-medium">
-                  {(
+                  {String(
                     currentTermCredits.practical + currentTermCredits.research
-                  ).toFixed(1)}
+                  )}
                 </TableCell>
-                <TableCell className="bg-primary/10 text-right font-bold text-primary">
-                  {totalSubtotal.toFixed(1)}
+                <TableCell className="bg-primary/20 text-right font-bold">
+                  {String(totalSubtotal)}
                 </TableCell>
                 <TableCell className="text-right text-sm font-medium">
                   {reqSubtotal}
@@ -318,14 +316,14 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
                       }
                     />
                   ) : (
-                    baseLectures.toFixed(1)
+                    String(baseLectures)
                   )}
                 </TableCell>
-                <TableCell className="text-right text-sm font-medium">
-                  {currentTermCredits.lectures.toFixed(1)}
+                <TableCell className="text-right text-sm font-medium text-muted-foreground">
+                  {String(currentTermCredits.lectures)}
                 </TableCell>
-                <TableCell className="bg-primary/5 text-right font-semibold text-primary">
-                  {totalLectures.toFixed(1)}
+                <TableCell className="bg-primary/10 text-right font-semibold text-muted-foreground">
+                  {String(totalLectures)}
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">
                   {reqLectures}以上
@@ -334,19 +332,19 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
 
               {/* 合計 */}
               <TableRow className="border-t-2 bg-muted/50 hover:bg-muted/50">
-                <TableCell className="font-bold">総合計</TableCell>
+                <TableCell className="font-bold">合計</TableCell>
                 <TableCell className="text-right font-bold">
-                  {(basePractical + baseResearch + baseLectures).toFixed(1)}
+                  {String(basePractical + baseResearch + baseLectures)}
                 </TableCell>
                 <TableCell className="text-right font-bold">
-                  {(
+                  {String(
                     currentTermCredits.practical +
-                    currentTermCredits.research +
-                    currentTermCredits.lectures
-                  ).toFixed(1)}
+                      currentTermCredits.research +
+                      currentTermCredits.lectures
+                  )}
                 </TableCell>
-                <TableCell className="bg-primary/20 text-right text-base font-bold text-primary">
-                  {grandTotal.toFixed(1)}
+                <TableCell className="bg-primary/30 text-right text-base font-bold">
+                  {String(grandTotal)}
                 </TableCell>
                 <TableCell className="text-right font-bold">
                   {reqTotal}以上
@@ -365,7 +363,7 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
               <span className="ml-1 text-foreground">
                 （現在{" "}
                 <strong className="text-foreground">
-                  {recommendationProgress.otherField.toFixed(1)}単位
+                  {String(recommendationProgress.otherField)}単位
                 </strong>
                 ）
               </span>
@@ -380,7 +378,7 @@ export function CreditsTable({ termType, enrolledCourses }: CreditsTableProps) {
               <span className="ml-1 text-foreground">
                 （現在{" "}
                 <strong className="text-foreground">
-                  {recommendationProgress.english.toFixed(1)}単位
+                  {String(recommendationProgress.english)}単位
                 </strong>
                 ）
               </span>

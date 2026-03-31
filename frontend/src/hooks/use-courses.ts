@@ -19,6 +19,95 @@ export interface CourseFilters {
   enrolledCourseIds?: Set<string>
 }
 
+type CoursesCache = {
+  data: CourseWithRelations[] | null
+  isLoading: boolean
+  error: Error | null
+  promise: Promise<void> | null
+}
+
+const coursesCache: CoursesCache = {
+  data: null,
+  isLoading: false,
+  error: null,
+  promise: null,
+}
+
+const courseListeners = new Set<() => void>()
+
+function emitCoursesChange() {
+  courseListeners.forEach((listener) => listener())
+}
+
+function getCoursesSnapshot() {
+  return {
+    allCourses: coursesCache.data ?? [],
+    isLoading: coursesCache.isLoading,
+    error: coursesCache.error,
+  }
+}
+
+async function fetchCoursesOnce() {
+  if (coursesCache.promise) return coursesCache.promise
+  if (coursesCache.data) return Promise.resolve()
+
+  coursesCache.isLoading = true
+  coursesCache.error = null
+  emitCoursesChange()
+
+  coursesCache.promise = (async () => {
+    const { data: latestCourse, error: latestErr } = await supabase
+      .from("courses")
+      .select("academic_year")
+      .order("academic_year", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latestErr) {
+      coursesCache.error = new Error(latestErr.message)
+      coursesCache.isLoading = false
+      emitCoursesChange()
+      return
+    }
+
+    if (!latestCourse) {
+      coursesCache.data = []
+      coursesCache.isLoading = false
+      emitCoursesChange()
+      return
+    }
+
+    const { data, error: err } = await supabase
+      .from("courses")
+      .select(
+        `
+          *,
+          schedules (*),
+          course_targets (*),
+          course_metadata (*)
+        `
+      )
+      .eq("academic_year", latestCourse.academic_year)
+      .order("code")
+
+    if (err) {
+      coursesCache.error = new Error(err.message)
+      coursesCache.isLoading = false
+      emitCoursesChange()
+      return
+    }
+
+    coursesCache.data = (data as CourseWithRelations[]) ?? []
+    coursesCache.error = null
+    coursesCache.isLoading = false
+    emitCoursesChange()
+  })().finally(() => {
+    coursesCache.promise = null
+  })
+
+  return coursesCache.promise
+}
+
 // Helper to expand terms into all overlapping terms
 function getOverlappingTerms(term: string): string[] {
   if (term === "前期") return ["前期", "前期前", "前期後"]
@@ -29,73 +118,25 @@ function getOverlappingTerms(term: string): string[] {
 }
 
 export function useCourses(filters?: CourseFilters) {
-  const [allCourses, setAllCourses] = useState<CourseWithRelations[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const [state, setState] = useState(getCoursesSnapshot)
 
-  // Fetch all courses once (183 courses — small enough to fetch in one go)
   useEffect(() => {
-    let cancelled = false
-
-    async function fetchCourses() {
-      setIsLoading(true)
-      setError(null)
-
-      const { data: latestCourse, error: latestErr } = await supabase
-        .from("courses")
-        .select("academic_year")
-        .order("academic_year", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (cancelled) return
-
-      if (latestErr) {
-        setError(new Error(latestErr.message))
-        setIsLoading(false)
-        return
-      }
-
-      if (!latestCourse) {
-        setAllCourses([])
-        setIsLoading(false)
-        return
-      }
-
-      const { data, error: err } = await supabase
-        .from("courses")
-        .select(
-          `
-          *,
-          schedules (*),
-          course_targets (*),
-          course_metadata (*)
-        `
-        )
-        .eq("academic_year", latestCourse.academic_year)
-        .order("code")
-
-      if (cancelled) return
-
-      if (err) {
-        setError(new Error(err.message))
-        setIsLoading(false)
-        return
-      }
-
-      setAllCourses((data as CourseWithRelations[]) ?? [])
-      setIsLoading(false)
+    const handleChange = () => {
+      setState(getCoursesSnapshot())
     }
 
-    fetchCourses()
+    courseListeners.add(handleChange)
+    handleChange()
+    void fetchCoursesOnce()
+
     return () => {
-      cancelled = true
+      courseListeners.delete(handleChange)
     }
   }, [])
 
   // Client-side filtering (fast on 183 courses)
   // Let the React Compiler handle memoization — no manual useMemo needed
-  let courses = allCourses
+  let courses = state.allCourses
 
   // Filter by target codes
   if (filters?.targets && filters.targets.length > 0) {
@@ -122,7 +163,9 @@ export function useCourses(filters?: CourseFilters) {
 
   // Free slots only filter (空きコマ)
   if (filters?.freeSlotsOnly && filters.enrolledCourseIds) {
-    const enrolledCourses = allCourses.filter(c => filters.enrolledCourseIds!.has(c.id))
+    const enrolledCourses = state.allCourses.filter((c) =>
+      filters.enrolledCourseIds!.has(c.id)
+    )
     const occupiedSlots = new Set<string>()
     for (const ec of enrolledCourses) {
       if (!ec.term) continue
@@ -133,13 +176,15 @@ export function useCourses(filters?: CourseFilters) {
         }
       }
     }
-    
+
     courses = courses.filter((c) => {
       // Hide already enrolled courses
       if (filters.enrolledCourseIds!.has(c.id)) return false
       if (!c.term) return true
       // Keep courses that DO NOT share any slot with occupiedSlots
-      return !c.schedules.some((s) => occupiedSlots.has(`${c.term}-${s.day}-${s.period}`))
+      return !c.schedules.some((s) =>
+        occupiedSlots.has(`${c.term}-${s.day}-${s.period}`)
+      )
     })
   }
 
@@ -161,5 +206,10 @@ export function useCourses(filters?: CourseFilters) {
     )
   }
 
-  return { courses, suggestionBase, isLoading, error }
+  return {
+    courses,
+    suggestionBase,
+    isLoading: state.isLoading,
+    error: state.error,
+  }
 }
