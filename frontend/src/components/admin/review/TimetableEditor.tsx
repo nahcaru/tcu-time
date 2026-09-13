@@ -1,8 +1,6 @@
 import {
   inferTerm,
-  VALID_DAYS,
   VALID_TERMS,
-  VALID_PERIODS,
   type RawCourse,
   type TimetableRawJson,
 } from "@/lib/approvalService"
@@ -15,6 +13,7 @@ import {
   AddButton,
   DeleteButton,
 } from "./FormControls"
+import { ScheduleEditor } from "./ScheduleEditor"
 
 interface TimetableEditorProps {
   raw: TimetableRawJson
@@ -200,63 +199,10 @@ export function TimetableEditor({
             </div>
 
             {/* Schedules */}
-            <div className="space-y-2">
-              <FormSectionHeader
-                title="曜日・時限"
-                count={(c.schedules ?? []).length}
-              />
-              <div className="space-y-1.5">
-                {(c.schedules ?? []).map((s, si) => (
-                  <div key={si} className="flex items-end gap-2">
-                    <FormSelect
-                      label="曜日"
-                      value={s.day}
-                      options={VALID_DAYS}
-                      onChange={(v) => {
-                        const sc = [...(c.schedules ?? [])]
-                        sc[si] = { ...sc[si], day: v }
-                        updateCourse(i, { schedules: sc })
-                      }}
-                      className="w-24 shrink-0"
-                    />
-                    <FormSelect
-                      label="時限"
-                      value={s.period}
-                      options={VALID_PERIODS}
-                      optionLabels={Object.fromEntries(
-                        VALID_PERIODS.map((p) => [String(p), `${p}限`])
-                      )}
-                      onChange={(v) => {
-                        const sc = [...(c.schedules ?? [])]
-                        sc[si] = { ...sc[si], period: Number(v) || 1 }
-                        updateCourse(i, { schedules: sc })
-                      }}
-                      className="w-24 shrink-0"
-                    />
-                    <DeleteButton
-                      onClick={() => {
-                        updateCourse(i, {
-                          schedules: (c.schedules ?? []).filter(
-                            (_, idx) => idx !== si
-                          ),
-                        })
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <AddButton
-                onClick={() => {
-                  updateCourse(i, {
-                    schedules: [
-                      ...(c.schedules ?? []),
-                      { day: "月", period: 1 },
-                    ],
-                  })
-                }}
-                label="コマを追加"
-              />
-            </div>
+            <ScheduleEditor
+              schedules={c.schedules ?? []}
+              onChange={(schedules) => updateCourse(i, { schedules })}
+            />
 
             {/* Targets */}
             <div className="space-y-2">

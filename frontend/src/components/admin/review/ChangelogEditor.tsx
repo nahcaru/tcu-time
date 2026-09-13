@@ -15,7 +15,7 @@ import {
   AddButton,
   DeleteButton,
 } from "./FormControls"
-import { ScheduleSlotsInput } from "./ScheduleSlotsInput"
+import { ScheduleEditor } from "./ScheduleEditor"
 
 const CHANGE_TYPE_LABEL: Record<string, string> = {
   create: "新規",
@@ -167,21 +167,23 @@ export function ChangelogEditor({
                   optionLabels={{ "": "指定なし" }}
                   onChange={(v) => updateChange(i, { term: v || null })}
                 />
-                <div className="sm:col-span-2">
-                  <ScheduleSlotsInput
-                    label="曜日・時限（複数コマ対応）"
-                    schedules={effectiveSchedules}
-                    onChange={(newScheds) => {
-                      const summaryDay = newScheds.map((s) => s.day).join(",")
-                      const firstPeriod = newScheds[0]?.period ?? null
-                      updateChange(i, {
-                        schedules: newScheds,
-                        day: summaryDay || null,
-                        period: firstPeriod,
-                      })
-                    }}
-                  />
-                </div>
+                {c.change_type === "create" && (
+                  <div className="sm:col-span-2">
+                    <ScheduleEditor
+                      label="曜日・時限"
+                      schedules={effectiveSchedules}
+                      onChange={(newScheds) => {
+                        const summaryDay = newScheds.map((s) => s.day).join(",")
+                        const firstPeriod = newScheds[0]?.period ?? null
+                        updateChange(i, {
+                          schedules: newScheds,
+                          day: summaryDay || null,
+                          period: firstPeriod,
+                        })
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Extra fields for create type */}
@@ -301,24 +303,17 @@ export function ChangelogEditor({
                           </div>
 
                           {fc.field === "曜日時限" ? (
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <ScheduleSlotsInput
-                                label="変更前コマ"
-                                schedules={parseScheduleString(fc.old_value)}
-                                onChange={(scheds) => {
-                                  const text = scheds
-                                    .map((s) => `${s.day}${s.period}`)
-                                    .join(",")
-                                  const fcs = [...(c.changes ?? [])]
-                                  fcs[fi] = {
-                                    ...fcs[fi],
-                                    old_value: text || null,
-                                  }
-                                  updateChange(i, { changes: fcs })
-                                }}
-                              />
-                              <ScheduleSlotsInput
-                                label="変更後コマ"
+                            <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                              {fc.old_value && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <span>変更前:</span>
+                                  <Badge variant="secondary" className="font-normal text-xs">
+                                    {fc.old_value}
+                                  </Badge>
+                                </div>
+                              )}
+                              <ScheduleEditor
+                                label="変更後（曜日・時限）"
                                 schedules={parseScheduleString(fc.new_value)}
                                 onChange={(scheds) => {
                                   const text = scheds
