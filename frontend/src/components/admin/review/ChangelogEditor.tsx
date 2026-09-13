@@ -15,7 +15,6 @@ import {
   AddButton,
   DeleteButton,
 } from "./FormControls"
-import { MultiTagInput } from "./MultiTagInput"
 import { ScheduleSlotsInput } from "./ScheduleSlotsInput"
 
 const CHANGE_TYPE_LABEL: Record<string, string> = {
@@ -197,24 +196,37 @@ export function ChangelogEditor({
                     placeholder="33G（横浜キャンパス）"
                     onChange={(v) => updateChange(i, { room: v || null })}
                   />
-                  <MultiTagInput
+                  <FormField
                     label="担当教員"
-                    values={c.instructors ?? []}
-                    onChange={(vals) => updateChange(i, { instructors: vals })}
-                    placeholder="教員名を入力して Enter（貼り付け可）"
-                  />
-                  <MultiTagInput
-                    label="受講対象"
-                    values={(c.targets ?? []).map((t) => t.target_name || t.target_code)}
-                    onChange={(vals) =>
+                    value={(c.instructors ?? []).join(", ")}
+                    placeholder="長沢 敬祐"
+                    onChange={(v) =>
                       updateChange(i, {
-                        targets: vals.map((name) => ({
-                          target_code: "",
-                          target_name: name,
-                        })),
+                        instructors: v
+                          .split(/[,、]/)
+                          .map((s) => s.trim())
+                          .filter(Boolean),
                       })
                     }
-                    placeholder="受講対象を入力して Enter（例: 00共通）"
+                  />
+                  <FormField
+                    label="受講対象"
+                    value={(c.targets ?? [])
+                      .map((t) => t.target_name || t.target_code)
+                      .join(", ")}
+                    placeholder="00共通"
+                    onChange={(v) =>
+                      updateChange(i, {
+                        targets: v
+                          .split(/[,、]/)
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .map((name) => ({
+                            target_code: "",
+                            target_name: name,
+                          })),
+                      })
+                    }
                   />
                 </div>
               )}
@@ -228,23 +240,12 @@ export function ChangelogEditor({
                   />
                   <div className="space-y-2.5">
                     {(c.changes ?? []).map((fc, fi) => {
-                      const isMultiTagField =
-                        fc.field === "担当者" || fc.field === "受講対象"
-
                       const options = Array.from(
                         new Set([
                           ...COMMON_CHANGE_FIELDS,
                           ...(fc.field ? [fc.field] : []),
                         ])
                       )
-
-                      const splitValues = (str: string | null | undefined) =>
-                        str
-                          ? str
-                              .split(/[,、\n]/)
-                              .map((s) => s.trim())
-                              .filter(Boolean)
-                          : []
 
                       return (
                         <div
@@ -299,36 +300,7 @@ export function ChangelogEditor({
                             />
                           </div>
 
-                          {isMultiTagField ? (
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <MultiTagInput
-                                label={`${fc.field}（変更前）`}
-                                values={splitValues(fc.old_value)}
-                                onChange={(vals) => {
-                                  const fcs = [...(c.changes ?? [])]
-                                  fcs[fi] = {
-                                    ...fcs[fi],
-                                    old_value: vals.join(", ") || null,
-                                  }
-                                  updateChange(i, { changes: fcs })
-                                }}
-                                placeholder="変更前の値（Enterで追加）"
-                              />
-                              <MultiTagInput
-                                label={`${fc.field}（変更後）`}
-                                values={splitValues(fc.new_value)}
-                                onChange={(vals) => {
-                                  const fcs = [...(c.changes ?? [])]
-                                  fcs[fi] = {
-                                    ...fcs[fi],
-                                    new_value: vals.join(", ") || null,
-                                  }
-                                  updateChange(i, { changes: fcs })
-                                }}
-                                placeholder="変更後の値（Enterで追加）"
-                              />
-                            </div>
-                          ) : fc.field === "曜日時限" ? (
+                          {fc.field === "曜日時限" ? (
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                               <ScheduleSlotsInput
                                 label="変更前コマ"

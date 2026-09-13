@@ -390,37 +390,6 @@ export function ReviewPage() {
 
           {/* Action buttons in header */}
           <div className="flex shrink-0 items-center gap-2">
-            {isReviewable && requiresChecklist && (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleAll}
-                  className="hidden text-xs text-muted-foreground hover:text-foreground md:inline-flex"
-                >
-                  {allChecked ? "全選択解除" : "全選択"}
-                </Button>
-                <Badge
-                  variant="outline"
-                  className="hidden text-xs sm:inline-flex"
-                >
-                  {checkedSet.size} / {itemCount} 確認済み
-                </Badge>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowShortcuts(true)}
-                  className="hidden gap-1 text-xs text-muted-foreground hover:text-foreground sm:inline-flex"
-                  title="キーボードショートカット一覧を表示 (?)"
-                >
-                  <IconKeyboard className="size-3.5" />
-                  <Kbd className="h-4 min-w-4 px-1 text-[10px]">?</Kbd>
-                </Button>
-              </>
-            )}
-
             {/* 戻る button: positioned to the left of 承認 */}
             <Button
               variant="outline"
@@ -517,17 +486,20 @@ export function ReviewPage() {
               <div className="flex items-center gap-2">
                 {requiresChecklist && (
                   <>
-                    <span className="text-xs text-muted-foreground sm:hidden">
-                      {checkedSet.size} / {itemCount}
-                    </span>
+                    <Badge
+                      variant="outline"
+                      className="text-xs"
+                    >
+                      {checkedSet.size} / {itemCount} 確認済み
+                    </Badge>
                     <Button
                       type="button"
                       variant="ghost"
                       size="xs"
                       onClick={toggleAll}
-                      className="text-xs text-primary md:hidden"
+                      className="text-xs text-muted-foreground hover:text-foreground"
                     >
-                      {allChecked ? "解除" : "全選択"}
+                      {allChecked ? "全選択解除" : "全選択"}
                     </Button>
                   </>
                 )}
@@ -536,8 +508,8 @@ export function ReviewPage() {
                   variant="ghost"
                   size="xs"
                   onClick={() => setShowShortcuts(true)}
-                  className="gap-1 text-xs text-muted-foreground hover:text-foreground sm:hidden"
-                  title="ショートカット (?)"
+                  className="gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  title="キーボードショートカット一覧を表示 (?)"
                 >
                   <IconKeyboard className="size-3.5" />
                   <Kbd className="h-4 min-w-4 px-1 text-[10px]">?</Kbd>
