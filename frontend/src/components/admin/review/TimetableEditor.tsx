@@ -1,19 +1,12 @@
 import {
   inferTerm,
-  VALID_TERMS,
   type RawCourse,
   type TimetableRawJson,
 } from "@/lib/approvalService"
 import { Badge } from "@/components/ui/badge"
 import { ReviewItemCard } from "./ReviewItemCard"
-import {
-  FormField,
-  FormSelect,
-  FormSectionHeader,
-  AddButton,
-  DeleteButton,
-} from "./FormControls"
-import { ScheduleEditor } from "./ScheduleEditor"
+import { AddButton } from "./FormControls"
+import { CourseFieldsEditor } from "./CourseFieldsEditor"
 
 interface TimetableEditorProps {
   raw: TimetableRawJson
@@ -105,174 +98,11 @@ export function TimetableEditor({
             onToggleOpen={onToggleExpand ? () => onToggleExpand(i) : undefined}
             onRemove={() => removeCourse(i)}
           >
-            {/* Basic fields */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <FormField
-                label="講義コード"
-                value={c.code}
-                placeholder="smba010011"
-                onChange={(v) => updateCourse(i, { code: v })}
-              />
-              <FormField
-                label="科目名"
-                value={c.name}
-                placeholder="科目名"
-                onChange={(v) => updateCourse(i, { name: v })}
-              />
-              <FormSelect
-                label="学期"
-                value={displayTerm}
-                options={VALID_TERMS}
-                onChange={(v) => updateCourse(i, { term: v })}
-              />
-              <FormField
-                label="教室"
-                value={c.room ?? ""}
-                placeholder="13C など"
-                onChange={(v) => updateCourse(i, { room: v })}
-              />
-              <FormField
-                label="配当年次"
-                value={c.year_level ?? 1}
-                onChange={(v) =>
-                  updateCourse(i, { year_level: Number(v) || 1 })
-                }
-              />
-              <FormField
-                label="クラス区分"
-                value={c.class_section ?? ""}
-                placeholder="A, B など"
-                onChange={(v) => updateCourse(i, { class_section: v })}
-              />
-              <div className="sm:col-span-2">
-                <FormField
-                  label="備考"
-                  value={c.notes ?? ""}
-                  placeholder="特記事項があれば入力"
-                  onChange={(v) => updateCourse(i, { notes: v })}
-                />
-              </div>
-            </div>
-
-            {/* Instructors */}
-            <div className="space-y-2">
-              <FormSectionHeader
-                title="担当教員"
-                count={(c.instructors ?? []).length}
-              />
-              <div className="space-y-1.5">
-                {(c.instructors ?? [""]).map((instr, ii) => (
-                  <div key={ii} className="flex items-center gap-2">
-                    <FormField
-                      label=""
-                      value={instr}
-                      placeholder="教員名"
-                      onChange={(v) => {
-                        const arr = [...(c.instructors ?? [""])]
-                        arr[ii] = v
-                        updateCourse(i, { instructors: arr })
-                      }}
-                      className="flex-1"
-                    />
-                    {(c.instructors ?? []).length > 1 && (
-                      <DeleteButton
-                        onClick={() => {
-                          updateCourse(i, {
-                            instructors: (c.instructors ?? []).filter(
-                              (_, idx) => idx !== ii
-                            ),
-                          })
-                        }}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <AddButton
-                onClick={() => {
-                  updateCourse(i, {
-                    instructors: [...(c.instructors ?? []), ""],
-                  })
-                }}
-                label="教員を追加"
-              />
-            </div>
-
-            {/* Schedules */}
-            <ScheduleEditor
-              schedules={c.schedules ?? []}
-              onChange={(schedules) => updateCourse(i, { schedules })}
+            <CourseFieldsEditor
+              course={c}
+              onChange={(updated) => updateCourse(i, updated)}
+              extractionSemester={extractionSemester || raw.semester}
             />
-
-            {/* Targets */}
-            <div className="space-y-2">
-              <FormSectionHeader
-                title="履修対象"
-                count={(c.targets ?? []).length}
-              />
-              <div className="space-y-2">
-                {(c.targets ?? []).map((t, ti) => (
-                  <div
-                    key={ti}
-                    className="grid grid-cols-1 items-end gap-2 rounded-lg border bg-muted/20 p-2.5 sm:grid-cols-3"
-                  >
-                    <FormField
-                      label="コード"
-                      value={t.target_code}
-                      placeholder="専修コード"
-                      onChange={(v) => {
-                        const tgt = [...(c.targets ?? [])]
-                        tgt[ti] = { ...tgt[ti], target_code: v }
-                        updateCourse(i, { targets: tgt })
-                      }}
-                    />
-                    <FormField
-                      label="名称"
-                      value={t.target_name}
-                      placeholder="専攻・コース名"
-                      onChange={(v) => {
-                        const tgt = [...(c.targets ?? [])]
-                        tgt[ti] = { ...tgt[ti], target_name: v }
-                        updateCourse(i, { targets: tgt })
-                      }}
-                    />
-                    <div className="flex items-end gap-1.5">
-                      <FormField
-                        label="備考"
-                        value={t.note ?? ""}
-                        placeholder="備考"
-                        onChange={(v) => {
-                          const tgt = [...(c.targets ?? [])]
-                          tgt[ti] = { ...tgt[ti], note: v }
-                          updateCourse(i, { targets: tgt })
-                        }}
-                        className="flex-1"
-                      />
-                      <DeleteButton
-                        onClick={() => {
-                          updateCourse(i, {
-                            targets: (c.targets ?? []).filter(
-                              (_, idx) => idx !== ti
-                            ),
-                          })
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <AddButton
-                onClick={() => {
-                  updateCourse(i, {
-                    targets: [
-                      ...(c.targets ?? []),
-                      { target_code: "", target_name: "", note: "" },
-                    ],
-                  })
-                }}
-                label="対象を追加"
-              />
-            </div>
           </ReviewItemCard>
         )
       })}
