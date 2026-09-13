@@ -120,7 +120,50 @@ def repair_database() -> None:
             client.table("courses").update({"term": target_term}).eq("id", cid).execute()
             repaired_courses += 1
 
-    print(f"\nDone! Repaired {repaired_courses} courses in courses table.")
+    print(f"\nDone! Repaired {repaired_courses} courses terms.")
+
+    print("\n=== Step 4: Repairing classrooms (教室) from PDF tables ===")
+    import requests
+    from pipeline.extractors.timetable import extract_room_map_from_pdf
+
+    global_room_map: dict[str, str] = {}
+    for ext in ext_res.data:
+        raw = ext.get("raw_json") or {}
+        courses = raw.get("courses", [])
+        if not courses:
+            continue
+        url = ext["pdf_url"]
+        try:
+            r = requests.get(url, timeout=30)
+            r.raise_for_status()
+            rmap = extract_room_map_from_pdf(r.content)
+            global_room_map.update(rmap)
+            rooms_updated = 0
+            for c in courses:
+                code = c.get("code")
+                if code in rmap:
+                    if c.get("room") != rmap[code]:
+                        c["room"] = rmap[code]
+                        rooms_updated += 1
+            if rooms_updated > 0:
+                print(f"Extraction {ext['id']} ({url.split('/')[-1]}): updated {rooms_updated} course rooms in raw_json")
+                client.table("extractions").update({"raw_json": raw}).eq("id", ext["id"]).execute()
+        except Exception as exc:
+            print(f"Failed extracting rooms for {url}: {exc}")
+
+    # Now update courses table
+    courses_res = client.table("courses").select("id, code, name, room").execute()
+    repaired_rooms = 0
+    for c in courses_res.data:
+        code = c.get("code")
+        current_room = (c.get("room") or "").strip()
+        if code in global_room_map:
+            target_room = global_room_map[code]
+            if current_room != target_room:
+                client.table("courses").update({"room": target_room}).eq("id", c["id"]).execute()
+                repaired_rooms += 1
+
+    print(f"Done! Repaired {repaired_rooms} courses with classrooms in courses table.")
 
 
 if __name__ == "__main__":

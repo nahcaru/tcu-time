@@ -263,7 +263,6 @@ def extract_courses_from_pdf(
                 config=genai.types.GenerateContentConfig(
                     temperature=0.0,
                     max_output_tokens=65536,
-                    thinking_config=types.ThinkingConfig(thinking_level="LOW"),
                     response_mime_type="application/json",
                     response_json_schema=TimetableResponse.model_json_schema(),
                 ),
@@ -288,5 +287,78 @@ def extract_courses_from_pdf(
         except Exception as exc:
             logger.error("Failed processing page %d: %s", idx + 1, exc)
 
+    # Enrich courses with deterministic room map from PDF tables
+    try:
+        room_map = extract_room_map_from_pdf(pdf_bytes)
+        for course in all_courses:
+            if not course.room and course.code in room_map:
+                course.room = room_map[course.code]
+    except Exception as exc:
+        logger.warning("Failed to extract room map from PDF: %s", exc)
+
     return deduplicate_courses(all_courses)
 
+
+def merge_room_lines(lines: list[str]) -> list[str]:
+    merged: list[str] = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if not merged:
+            merged.append(line)
+        elif line.startswith(",") or merged[-1].endswith(","):
+            merged[-1] += line
+        elif line in ("イトクラス", "議室", "学院製図室", "階）", "階)", "室(10号館3", "（2号館3"):
+            merged[-1] += line
+        elif merged[-1].endswith(("サテラ", "2階会", "2階大", "機械系実験", "臨床実習室", "（2号館3")):
+            merged[-1] += line
+        else:
+            merged.append(line)
+    return merged
+
+
+def extract_room_map_from_pdf(pdf_bytes: bytes) -> dict[str, str]:
+    """Extract mapping of course code -> classroom directly from PDF tables."""
+    code_to_room: dict[str, str] = {}
+    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+        for page in pdf.pages:
+            tables = page.extract_tables()
+            for table in tables:
+                if not table or len(table) < 2:
+                    continue
+                header = table[0]
+                code_col = None
+                room_col = None
+                for idx, col in enumerate(header):
+                    if col and "コード" in col:
+                        code_col = idx
+                    elif col and "教室" in col:
+                        room_col = idx
+                if code_col is None or room_col is None:
+                    continue
+
+                for row in table[1:]:
+                    if len(row) <= max(code_col, room_col):
+                        continue
+                    code_cell = row[code_col] or ""
+                    room_cell = row[room_col] or ""
+                    codes = [
+                        c.strip()
+                        for c in code_cell.splitlines()
+                        if c.strip().startswith("sm")
+                    ]
+                    if not codes:
+                        continue
+                    cleaned_rooms = merge_room_lines(
+                        [r.strip() for r in room_cell.splitlines() if r.strip()]
+                    )
+                    if len(codes) == len(cleaned_rooms):
+                        for c, rm in zip(codes, cleaned_rooms):
+                            if rm and rm != "-":
+                                code_to_room[c] = rm
+                    elif len(codes) == 1:
+                        rm = "".join(cleaned_rooms)
+                        if rm and rm != "-":
+                            code_to_room[codes[0]] = rm
+    return code_to_room
