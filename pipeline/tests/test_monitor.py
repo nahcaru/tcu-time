@@ -528,6 +528,25 @@ class TestExtractAdvancePdfLinks:
         assert "https://example.com/grad_front.pdf" not in urls
         assert "https://example.com/grad_changes.pdf" not in urls
 
+    def test_filters_by_department_and_ignores_other_departments(self) -> None:
+        """Should only extract PDF links for target department (総合理工学研究科) and exclude other departments (環境情報学研究科)."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【先行履修】</h3></div>
+          <h4>総合理工学研究科〈全専攻〉</h4>
+          <p><a href="https://example.com/souri_advance.pdf">総合理工学研究科　先行履修についての案内</a></p>
+          <hr/>
+          <h4>環境情報学研究科〈都市生活学専攻〉</h4>
+          <p><a href="https://example.com/kankyou_advance.pdf">環境情報学研究科　博士前期課程授業科目の先行履修について</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html, department="総合理工学研究科")
+        assert len(links) == 1
+        assert links[0].url == "https://example.com/souri_advance.pdf"
+        assert "総合理工学研究科" in links[0].label
+
     def test_custom_section_header(self) -> None:
         """Should support custom section header."""
         html = """\

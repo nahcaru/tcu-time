@@ -104,8 +104,11 @@ def extract_advance_pdf_links(
     html: str,
     *,
     section_header: str = ADVANCE_SECTION_HEADER,
+    department: str = GRAD_DEPARTMENT,
 ) -> list[PdfLink]:
-    return _extract_advance_pdf_links(html, section_header=section_header)
+    return _extract_advance_pdf_links(
+        html, section_header=section_header, department=department
+    )
 
 
 # ---------------------------------------------------------------------------

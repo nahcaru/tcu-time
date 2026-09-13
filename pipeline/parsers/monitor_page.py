@@ -114,6 +114,7 @@ def extract_advance_pdf_links(
     html: str,
     *,
     section_header: str = ADVANCE_SECTION_HEADER,
+    department: str = GRAD_DEPARTMENT,
 ) -> list[PdfLink]:
     soup = BeautifulSoup(html, "html.parser")
     root = soup.find("div", id="main") or soup
@@ -129,23 +130,58 @@ def extract_advance_pdf_links(
         logger.debug("No <section> containing <h3> with '%s' found", section_header)
         return []
 
+    # Look for department heading (e.g. <h4>総合理工学研究科〈全専攻〉</h4>)
+    target_h4: Tag | None = None
+    h4_tags = advance_section.find_all("h4")
+    for h4 in h4_tags:
+        if department in h4.get_text():
+            target_h4 = h4
+            break
+
     seen: set[str] = set()
     links: list[PdfLink] = []
-    for anchor in advance_section.find_all("a", href=True):
-        href = str(anchor["href"])
-        text = anchor.get_text(strip=True)
-        if not href.lower().endswith(".pdf"):
-            continue
-        if href.startswith("//"):
-            href = "https:" + href
-        elif href.startswith("/"):
-            href = f"https://www.asc.tcu.ac.jp{href}"
-        if href in seen:
-            continue
-        seen.add(href)
-        links.append(PdfLink(url=href, label=text))
 
-    logger.info("Found %d advance-enrollment PDF link(s) in '%s' section", len(links), section_header)
+    if target_h4 is not None:
+        for sibling in iter_siblings_until(target_h4, {"h4", "hr"}):
+            anchors = sibling.find_all("a", href=True) if sibling.name != "a" else [sibling]
+            for anchor in anchors:
+                href = str(anchor["href"])
+                text = anchor.get_text(strip=True)
+                if not href.lower().endswith(".pdf"):
+                    continue
+                if href.startswith("//"):
+                    href = "https:" + href
+                elif href.startswith("/"):
+                    href = f"https://www.asc.tcu.ac.jp{href}"
+                if href in seen:
+                    continue
+                seen.add(href)
+                links.append(PdfLink(url=href, label=text))
+    else:
+        for anchor in advance_section.find_all("a", href=True):
+            href = str(anchor["href"])
+            text = anchor.get_text(strip=True)
+            if not href.lower().endswith(".pdf"):
+                continue
+            if h4_tags and department not in text:
+                continue
+            if "環境情報" in text and department not in text:
+                continue
+            if href.startswith("//"):
+                href = "https:" + href
+            elif href.startswith("/"):
+                href = f"https://www.asc.tcu.ac.jp{href}"
+            if href in seen:
+                continue
+            seen.add(href)
+            links.append(PdfLink(url=href, label=text))
+
+    logger.info(
+        "Found %d advance-enrollment PDF link(s) for '%s' in '%s' section",
+        len(links),
+        department,
+        section_header,
+    )
     return links
 
 
