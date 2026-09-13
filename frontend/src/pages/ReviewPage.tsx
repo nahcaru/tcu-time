@@ -20,6 +20,7 @@ import { KeyboardShortcutsDialog } from "@/components/admin/review/KeyboardShort
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Kbd } from "@/components/ui/kbd"
 import {
   IconArrowLeft,
   IconExternalLink,
@@ -326,85 +327,70 @@ export function ReviewPage() {
           </div>
 
           {/* Action buttons in header */}
-          {isReviewable && (
-            <div className="flex shrink-0 items-center gap-2">
-              {requiresChecklist && (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleAll}
-                    className="hidden text-xs text-muted-foreground hover:text-foreground md:inline-flex"
-                  >
-                    {allChecked ? "全選択解除" : "全選択"}
-                  </Button>
-                  <Badge
-                    variant="outline"
-                    className="hidden text-xs sm:inline-flex"
-                  >
-                    {checkedSet.size} / {itemCount} 確認済み
-                  </Badge>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowShortcuts(true)}
-                    className="hidden gap-1 text-xs text-muted-foreground hover:text-foreground sm:inline-flex"
-                    title="キーボードショートカット一覧を表示 (?)"
-                  >
-                    <IconKeyboard className="size-3.5" />
-                    <kbd className="rounded border bg-muted/60 px-1 py-0.2 font-mono text-[10px]">
-                      ?
-                    </kbd>
-                  </Button>
-                </>
-              )}
+          <div className="flex shrink-0 items-center gap-2">
+            {isReviewable && requiresChecklist && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleAll}
+                  className="hidden text-xs text-muted-foreground hover:text-foreground md:inline-flex"
+                >
+                  {allChecked ? "全選択解除" : "全選択"}
+                </Button>
+                <Badge
+                  variant="outline"
+                  className="hidden text-xs sm:inline-flex"
+                >
+                  {checkedSet.size} / {itemCount} 確認済み
+                </Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowShortcuts(true)}
+                  className="hidden gap-1 text-xs text-muted-foreground hover:text-foreground sm:inline-flex"
+                  title="キーボードショートカット一覧を表示 (?)"
+                >
+                  <IconKeyboard className="size-3.5" />
+                  <Kbd className="h-4 min-w-4 px-1 text-[10px]">?</Kbd>
+                </Button>
+              </>
+            )}
+
+            {/* 戻る button: positioned to the left of 承認 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/admin")}
+              className="gap-1 text-xs sm:text-sm"
+            >
+              <IconArrowLeft className="size-4" />
+              <span>戻る</span>
+            </Button>
+
+            {/* 承認 button */}
+            {isReviewable && (
               <Button
                 onClick={handleApprove}
                 disabled={!canSubmit}
                 size="sm"
+                className="text-xs sm:text-sm"
                 title={
                   requiresChecklist && !allChecked
                     ? "すべての項目にチェックを入れてください"
                     : ""
                 }
               >
-                {acting
-                  ? "処理中…"
-                  : status === "approved"
-                    ? "再反映して更新"
-                    : "承認して反映"}
+                {acting ? "処理中…" : "承認"}
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </PageHeader>
 
       <div className="flex min-h-0 flex-1 flex-col px-4 py-4 pt-14 md:px-6 md:pt-4">
-        {/* Back button */}
-        <div className="mb-3 shrink-0 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/admin")}
-            className="-ml-2 h-8 gap-1.5 text-muted-foreground hover:text-foreground"
-          >
-            <IconArrowLeft className="size-4" />
-            <span>一覧へ戻る</span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onClick={() => setShowShortcuts(true)}
-            className="text-xs text-muted-foreground hover:text-foreground gap-1.5 sm:hidden"
-          >
-            <IconKeyboard className="size-3.5" />
-            <span>ショートカット (?)</span>
-          </Button>
-        </div>
-
         {/* Main 2-column split layout */}
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
           {/* Left: PDF viewer Card */}
@@ -449,22 +435,35 @@ export function ReviewPage() {
                   {itemCount} 件
                 </Badge>
               </div>
-              {requiresChecklist && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground sm:hidden">
-                    {checkedSet.size} / {itemCount}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={toggleAll}
-                    className="text-xs text-primary md:hidden"
-                  >
-                    {allChecked ? "解除" : "全選択"}
-                  </Button>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {requiresChecklist && (
+                  <>
+                    <span className="text-xs text-muted-foreground sm:hidden">
+                      {checkedSet.size} / {itemCount}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={toggleAll}
+                      className="text-xs text-primary md:hidden"
+                    >
+                      {allChecked ? "解除" : "全選択"}
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setShowShortcuts(true)}
+                  className="gap-1 text-xs text-muted-foreground hover:text-foreground sm:hidden"
+                  title="ショートカット (?)"
+                >
+                  <IconKeyboard className="size-3.5" />
+                  <Kbd className="h-4 min-w-4 px-1 text-[10px]">?</Kbd>
+                </Button>
+              </div>
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-4">

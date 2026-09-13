@@ -85,9 +85,6 @@ export function ExtractionTableSkeleton() {
 export function ReviewPageSkeleton() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Top back button skeleton */}
-      <Skeleton className="h-8 w-24 rounded-md" />
-
       {/* Split layout */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Left PDF skeleton */}
