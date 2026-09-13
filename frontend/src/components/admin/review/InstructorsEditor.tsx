@@ -15,7 +15,7 @@ interface InstructorsEditorProps {
 }
 
 export function InstructorsEditor({
-  label = "担当教員",
+  label = "担当者",
   instructors,
   onChange,
   className,
@@ -61,7 +61,7 @@ export function InstructorsEditor({
           </div>
         ))}
       </div>
-      <AddButton onClick={addInstructor} label="教員を追加" />
+      <AddButton onClick={addInstructor} label="担当者を追加" />
     </div>
   )
 }

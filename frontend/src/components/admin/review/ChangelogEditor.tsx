@@ -2,6 +2,9 @@ import {
   CHANGE_TYPES,
   VALID_TERMS,
   parseScheduleString,
+  parseSingleTarget,
+  parseTargetsString,
+  formatTargetsString,
   type RawChange,
   type ChangelogRawJson,
   type RawSchedule,
@@ -174,7 +177,19 @@ export function ChangelogEditor({
                       room: c.room ?? undefined,
                       instructors: c.instructors ?? [],
                       schedules: effectiveSchedules,
-                      targets: c.targets ?? [],
+                      targets: (c.targets ?? []).map((t) => {
+                        if (!t.target_code && t.target_name) {
+                          const parsed = parseSingleTarget(t.target_name)
+                          if (parsed.target_code) {
+                            return {
+                              target_code: parsed.target_code,
+                              target_name: parsed.target_name,
+                              note: t.note || parsed.note,
+                            }
+                          }
+                        }
+                        return t
+                      }),
                     }}
                     onChange={(updated) => {
                       updateChange(i, {
@@ -196,8 +211,8 @@ export function ChangelogEditor({
                 </div>
               ) : c.change_type === "delete" ? (
                 /* 2. 削除 (delete): 削除対象の特定用フィールドのみ */
-                <div className="space-y-3 rounded-lg border bg-destructive/5 p-3">
-                  <div className="text-xs font-semibold text-destructive">
+                <div className="space-y-3 rounded-lg border bg-muted/10 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground">
                     削除対象の科目（特定用）
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -312,19 +327,6 @@ export function ChangelogEditor({
                               />
                             </div>
 
-                            {/* A案: 変更前は参考情報としてバッジ表示（非編集） */}
-                            {fc.old_value && (
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <span>変更前:</span>
-                                <Badge
-                                  variant="secondary"
-                                  className="font-normal text-xs"
-                                >
-                                  {fc.old_value}
-                                </Badge>
-                              </div>
-                            )}
-
                             {/* 変更後フォーム（共通コンポーネントを使用） */}
                             {fc.field === "曜日時限" ? (
                               <ScheduleEditor
@@ -344,7 +346,7 @@ export function ChangelogEditor({
                               />
                             ) : fc.field === "担当者" ? (
                               <InstructorsEditor
-                                label="変更後（担当教員）"
+                                label="変更後（担当者）"
                                 instructors={
                                   fc.new_value
                                     ? fc.new_value
@@ -366,31 +368,13 @@ export function ChangelogEditor({
                             ) : fc.field === "受講対象" ? (
                               <TargetsEditor
                                 label="変更後（受講対象）"
-                                targets={
-                                  fc.new_value
-                                    ? fc.new_value
-                                        .split(/[,、/]/)
-                                        .map((s) => s.trim())
-                                        .filter(Boolean)
-                                        .map((name) => ({
-                                          target_code: "",
-                                          target_name: name,
-                                          note: "",
-                                        }))
-                                    : []
-                                }
+                                targets={parseTargetsString(fc.new_value)}
                                 onChange={(list) => {
                                   const fcs = [...(c.changes ?? [])]
                                   fcs[fi] = {
                                     ...fcs[fi],
                                     new_value:
-                                      list
-                                        .map(
-                                          (t) =>
-                                            t.target_name || t.target_code
-                                        )
-                                        .filter(Boolean)
-                                        .join(", ") || null,
+                                      formatTargetsString(list) || null,
                                   }
                                   updateChange(i, { changes: fcs })
                                 }}

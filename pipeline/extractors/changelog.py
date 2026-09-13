@@ -128,6 +128,26 @@ def parse_day_period(text: str | None) -> tuple[str | None, int | str | None]:
     return d, p
 
 
+def parse_target_str(s: str) -> CourseTarget:
+    """Parse target string into code, name, and note."""
+    s = s.strip()
+    if not s:
+        return CourseTarget(target_code="", target_name="", note="")
+    note = ""
+    m_note = re.search(r"^(.*?)[（(]([^）)]+)[）)]\s*$", s)
+    if m_note:
+        s = m_note.group(1).strip()
+        note = m_note.group(2).strip()
+    m_code = re.match(r"^([0-9]{1,2}[A-Za-z]?|[A-Za-z0-9]+)[\s:：\-・]*(.*)$", s)
+    if m_code and re.match(r"^\d", m_code.group(1)):
+        return CourseTarget(
+            target_code=m_code.group(1),
+            target_name=m_code.group(2) or "",
+            note=note,
+        )
+    return CourseTarget(target_code="", target_name=s, note=note)
+
+
 def _detect_headers(row: list[str | None]) -> list[str] | None:
     """Detect if row matches TCU changelog headers and return canonical names."""
     if not row:
@@ -238,7 +258,7 @@ def _parse_table_row(
         target_raw = strip_new(row_dict.get("受講対象", ""))
         targets = (
             [
-                CourseTarget(target_code="", target_name=x.strip())
+                parse_target_str(x)
                 for x in re.split(r"[,、/\n]", target_raw)
                 if x.strip()
             ]

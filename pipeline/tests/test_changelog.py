@@ -14,6 +14,7 @@ from ..extractors.changelog import (
     extract_changelog_from_pdf_tables,
     parse_changelog,
     parse_day_period,
+    parse_target_str,
 )
 from ..models import ChangeEntry, FieldChange
 
@@ -39,6 +40,27 @@ class TestTextAndScheduleHelpers:
         assert parse_day_period("") == (None, None)
         assert parse_day_period("-") == (None, None)
         assert parse_day_period(None) == (None, None)
+
+    def test_parse_target_str(self) -> None:
+        t1 = parse_target_str("00共通")
+        assert t1.target_code == "00"
+        assert t1.target_name == "共通"
+        assert t1.note == ""
+
+        t2 = parse_target_str("08都市工学（全専攻）")
+        assert t2.target_code == "08"
+        assert t2.target_name == "都市工学"
+        assert t2.note == "全専攻"
+
+        t3 = parse_target_str("10A 情報科学科")
+        assert t3.target_code == "10A"
+        assert t3.target_name == "情報科学科"
+        assert t3.note == ""
+
+        t4 = parse_target_str("機械システム専攻")
+        assert t4.target_code == ""
+        assert t4.target_name == "機械システム専攻"
+        assert t4.note == ""
 
 
 class TestHeaderDetection:
@@ -260,7 +282,8 @@ class TestParseTableRow:
         assert entry.instructors == ["長沢 敬祐"]
         assert entry.room == "33G(横浜キャンパス)"
         assert len(entry.targets) == 1
-        assert entry.targets[0].target_name == "00共通"
+        assert entry.targets[0].target_code == "00"
+        assert entry.targets[0].target_name == "共通"
         assert entry.changes == []
 
 

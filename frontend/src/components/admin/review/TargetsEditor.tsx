@@ -16,7 +16,7 @@ interface TargetsEditorProps {
 }
 
 export function TargetsEditor({
-  label = "履修対象",
+  label = "受講対象",
   targets,
   onChange,
   className,
@@ -77,7 +77,7 @@ export function TargetsEditor({
           ))}
         </div>
       )}
-      <AddButton onClick={addTarget} label="対象を追加" />
+      <AddButton onClick={addTarget} label="受講対象を追加" />
     </div>
   )
 }

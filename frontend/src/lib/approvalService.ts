@@ -68,6 +68,56 @@ export function parseScheduleString(
   return schedules
 }
 
+export function parseSingleTarget(raw: string): RawTarget {
+  const trimmed = raw.trim()
+  if (!trimmed) return { target_code: "", target_name: "", note: "" }
+
+  let base = trimmed
+  let note = ""
+  const noteMatch = base.match(/^(.+?)[（(]([^）)]+)[）)]\s*$/)
+  if (noteMatch) {
+    base = noteMatch[1].trim()
+    note = noteMatch[2].trim()
+  }
+
+  const codeMatch = base.match(/^([0-9]{1,2}[A-Za-z]?|[A-Za-z0-9]+)[\s:：\-・]*(.*)$/)
+  if (codeMatch && /^\d/.test(codeMatch[1])) {
+    return {
+      target_code: codeMatch[1],
+      target_name: codeMatch[2] || "",
+      note,
+    }
+  }
+
+  return {
+    target_code: "",
+    target_name: base,
+    note,
+  }
+}
+
+export function parseTargetsString(raw: string | null | undefined): RawTarget[] {
+  if (!raw) return []
+  return raw
+    .split(/[,、\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(parseSingleTarget)
+}
+
+export function formatTargetsString(targets: RawTarget[]): string {
+  return targets
+    .map((t) => {
+      const code = t.target_code.trim()
+      const name = t.target_name.trim()
+      const base = code && name ? `${code}${name}` : code || name
+      const note = t.note?.trim() ? `（${t.note.trim()}）` : ""
+      return `${base}${note}`
+    })
+    .filter(Boolean)
+    .join(", ")
+}
+
 export interface RawChange {
   change_type: "create" | "update" | "delete"
   course_code?: string | null
@@ -334,23 +384,20 @@ async function applyChangelogApproval(
                 }))
               )
             }
-          } else if (field === "受講対象") {
+          } else if (field === "受講対象" || field === "履修対象") {
             if (fc.new_value) {
-              const targetList = fc.new_value
-                .split(/[,、/]/)
-                .map((s) => s.trim())
-                .filter(Boolean)
-              if (targetList.length > 0) {
+              const targets = parseTargetsString(fc.new_value)
+              if (targets.length > 0) {
                 await supabase
                   .from("course_targets")
                   .delete()
                   .eq("course_id", found.id)
                 await supabase.from("course_targets").insert(
-                  targetList.map((t) => ({
+                  targets.map((t) => ({
                     course_id: found.id,
-                    target_code: "",
-                    target_name: t,
-                    note: "",
+                    target_code: t.target_code,
+                    target_name: t.target_name,
+                    note: t.note ?? "",
                   }))
                 )
               }
