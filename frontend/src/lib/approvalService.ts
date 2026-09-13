@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "@/lib/supabase"
-import type { Json } from "@/lib/database.types"
+import type { Database, Json } from "@/lib/database.types"
 
 // ---------------------------------------------------------------------------
 // Constants (shared with ReviewPage editors)
@@ -235,7 +235,10 @@ async function applyChangelogApproval(
           updates[fc.field] = fc.new_value
         }
         if (Object.keys(updates).length > 0) {
-          await supabase.from("courses").update(updates).eq("id", found.id)
+          await supabase
+            .from("courses")
+            .update(updates as Database["public"]["Tables"]["courses"]["Update"])
+            .eq("id", found.id)
         }
       }
       count++

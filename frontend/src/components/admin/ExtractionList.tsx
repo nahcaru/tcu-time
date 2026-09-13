@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router"
 import { supabase } from "@/lib/supabase"
 import type { Extraction } from "@/lib/database.types"
+import { ExtractionTableSkeleton } from "@/components/admin/AdminSkeleton"
 
 type StatusFilter = "all" | "extracted" | "approved" | "pending"
 
@@ -35,6 +36,7 @@ export function ExtractionList() {
   const [extractions, setExtractions] = useState<Extraction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<StatusFilter>("extracted")
+  const [latestOnly, setLatestOnly] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -63,6 +65,20 @@ export function ExtractionList() {
     fetchData()
   }, [filter])
 
+  // Solely list the latest of each document type when latestOnly is true
+  const displayedExtractions = useMemo(() => {
+    if (!latestOnly) return extractions
+
+    const seen = new Set<string>()
+    return extractions.filter((ext) => {
+      // Group by document identity: (pdf_type, semester)
+      const docKey = `${ext.pdf_type ?? "unknown"}_${ext.semester ?? "all"}`
+      if (seen.has(docKey)) return false
+      seen.add(docKey)
+      return true
+    })
+  }, [extractions, latestOnly])
+
   const filters: { value: StatusFilter; label: string }[] = [
     { value: "all",       label: "すべて" },
     { value: "extracted", label: "承認待ち" },
@@ -72,38 +88,63 @@ export function ExtractionList() {
 
   return (
     <div className="space-y-4">
-      {/* Filter tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {filters.map((f) => (
+      {/* Filter tabs and Latest Only Toggle */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2 flex-wrap">
+          {filters.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                filter === f.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/70"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Latest Only Toggle */}
+        <div className="flex items-center gap-2">
           <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              filter === f.value
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/70"
+            type="button"
+            onClick={() => setLatestOnly((prev) => !prev)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              latestOnly
+                ? "bg-secondary text-secondary-foreground border-border shadow-xs"
+                : "bg-background text-muted-foreground border-border/80 hover:bg-muted/50"
             }`}
           >
-            {f.label}
+            <span className={latestOnly ? "text-primary" : "text-muted-foreground"}>
+              {latestOnly ? "✓" : "○"}
+            </span>
+            <span>各書類の最新版のみ表示</span>
+            <span className="text-[10px] text-muted-foreground ml-0.5">
+              ({displayedExtractions.length} / {extractions.length}件)
+            </span>
           </button>
-        ))}
+        </div>
       </div>
 
-      {/* Loading / error states */}
-      {loading && (
-        <div className="text-center py-12 text-muted-foreground">読み込み中…</div>
-      )}
-      {error && (
+      {/* Loading state */}
+      {loading && <ExtractionTableSkeleton />}
+
+      {/* Error state */}
+      {error && !loading && (
         <div className="text-center py-12 text-destructive">{error}</div>
       )}
-      {!loading && !error && extractions.length === 0 && (
+
+      {/* Empty state */}
+      {!loading && !error && displayedExtractions.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           該当する抽出タスクがありません
         </div>
       )}
 
       {/* Table */}
-      {!loading && !error && extractions.length > 0 && (
+      {!loading && !error && displayedExtractions.length > 0 && (
         <div className="rounded-xl border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
@@ -118,7 +159,7 @@ export function ExtractionList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {extractions.map((ext) => {
+              {displayedExtractions.map((ext) => {
                 const status = ext.status ?? "pending"
                 const badge = STATUS_LABELS[status] ?? { label: status, color: "bg-muted text-muted-foreground" }
                 return (
@@ -128,7 +169,14 @@ export function ExtractionList() {
                     onClick={() => navigate(`/admin/review/${ext.id}`)}
                   >
                     <td className="px-4 py-3">
-                      {PDF_TYPE_LABELS[ext.pdf_type ?? ""] ?? ext.pdf_type ?? "—"}
+                      <div className="flex items-center gap-1.5">
+                        <span>{PDF_TYPE_LABELS[ext.pdf_type ?? ""] ?? ext.pdf_type ?? "—"}</span>
+                        {latestOnly && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-muted text-muted-foreground font-mono">
+                            最新
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {SEMESTER_LABELS[ext.semester ?? ""] ?? ext.semester ?? "—"}

@@ -4,6 +4,7 @@ import { TimeSlots } from "@/components/timetable/TimeSlots"
 import { CourseGrid } from "@/components/timetable/CourseGrid"
 import { IntensiveCourses } from "@/components/timetable/IntensiveCourses"
 import { CreditsTable } from "@/components/timetable/CreditsTable"
+import { TimetableSkeleton } from "@/components/timetable/TimetableSkeleton"
 import { useCourses } from "@/hooks/use-courses"
 import { useEnrollments } from "@/hooks/use-enrollments"
 import { SPRING_TERMS, FALL_TERMS, QUARTER_PERIODS } from "@/lib/constants"
@@ -12,9 +13,14 @@ import { PageHeader } from "@/components/layout/PageHeader"
 import { usePageTutorial } from "@/hooks/use-page-tutorial"
 
 export function TimetablePage() {
-  const { enrolledCourseIds, addEnrollment, removeEnrollment } =
-    useEnrollments()
-  const { courses: allCourses } = useCourses()
+  const {
+    enrolledCourseIds,
+    addEnrollment,
+    removeEnrollment,
+    isLoading: isEnrollmentsLoading,
+  } = useEnrollments()
+  const { courses: allCourses, isLoading: isCoursesLoading } = useCourses()
+  const isLoading = isEnrollmentsLoading || isCoursesLoading
 
   usePageTutorial("timetable")
 
@@ -53,39 +59,47 @@ export function TimetablePage() {
       </PageHeader>
 
       <div className="flex min-h-full w-full flex-1 flex-col px-4 pt-14 md:px-6 md:pt-0">
-        <TabsContent value="spring">
-          <SemesterContent
-            regularCourses={
-              regularCourses(SPRING_TERMS) as CourseWithRelations[]
-            }
-            intensiveCourses={
-              intensiveCourses(SPRING_TERMS) as CourseWithRelations[]
-            }
-            enrolledCourses={enrolledCourses}
-            firstHalfTerms={["前期前", "前期"]}
-            secondHalfTerms={["前期後", "前期"]}
-            termType="前期"
-            addEnrollment={addEnrollment}
-            removeEnrollment={removeEnrollment}
-            enrolledCourseIds={enrolledCourseIds}
-          />
-        </TabsContent>
+        {isLoading ? (
+          <TimetableSkeleton />
+        ) : (
+          <>
+            <TabsContent value="spring">
+              <SemesterContent
+                regularCourses={
+                  regularCourses(SPRING_TERMS) as CourseWithRelations[]
+                }
+                intensiveCourses={
+                  intensiveCourses(SPRING_TERMS) as CourseWithRelations[]
+                }
+                enrolledCourses={enrolledCourses}
+                firstHalfTerms={["前期前", "前期"]}
+                secondHalfTerms={["前期後", "前期"]}
+                termType="前期"
+                addEnrollment={addEnrollment}
+                removeEnrollment={removeEnrollment}
+                enrolledCourseIds={enrolledCourseIds}
+              />
+            </TabsContent>
 
-        <TabsContent value="fall" className="mt-0">
-          <SemesterContent
-            regularCourses={regularCourses(FALL_TERMS) as CourseWithRelations[]}
-            intensiveCourses={
-              intensiveCourses(FALL_TERMS) as CourseWithRelations[]
-            }
-            enrolledCourses={enrolledCourses}
-            firstHalfTerms={["後期前", "後期"]}
-            secondHalfTerms={["後期後", "後期"]}
-            termType="後期"
-            addEnrollment={addEnrollment}
-            removeEnrollment={removeEnrollment}
-            enrolledCourseIds={enrolledCourseIds}
-          />
-        </TabsContent>
+            <TabsContent value="fall" className="mt-0">
+              <SemesterContent
+                regularCourses={
+                  regularCourses(FALL_TERMS) as CourseWithRelations[]
+                }
+                intensiveCourses={
+                  intensiveCourses(FALL_TERMS) as CourseWithRelations[]
+                }
+                enrolledCourses={enrolledCourses}
+                firstHalfTerms={["後期前", "後期"]}
+                secondHalfTerms={["後期後", "後期"]}
+                termType="後期"
+                addEnrollment={addEnrollment}
+                removeEnrollment={removeEnrollment}
+                enrolledCourseIds={enrolledCourseIds}
+              />
+            </TabsContent>
+          </>
+        )}
       </div>
     </Tabs>
   )
