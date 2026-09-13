@@ -108,6 +108,18 @@ class ChangeEntry(BaseModel):
     period: int | str | None = None
     changes: list[FieldChange] = []
 
+    @field_validator("change_type", mode="before")
+    @classmethod
+    def normalize_change_type(cls, v: object) -> str:
+        s = str(v).lower().strip()
+        if s in ("modify", "update", "更新"):
+            return "update"
+        if s in ("cancel", "delete", "削除"):
+            return "delete"
+        if s in ("add", "create", "新規"):
+            return "create"
+        return s
+
     @field_validator("period", mode="before")
     @classmethod
     def coerce_period(cls, v: object) -> int | str | None:

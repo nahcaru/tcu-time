@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router"
 import { supabase } from "@/lib/supabase"
 import type { Extraction } from "@/lib/database.types"
 import {
   approveExtraction,
+  saveReviewDraft,
+  getSavedReviewIndices,
   inferTerm,
   type TimetableRawJson,
   type ChangelogRawJson,
@@ -28,6 +30,7 @@ import {
   IconCheck,
   IconAlertCircle,
   IconKeyboard,
+  IconDeviceFloppy,
 } from "@tabler/icons-react"
 
 const PDF_TYPE_LABELS: Record<string, string> = {
@@ -55,6 +58,7 @@ export function ReviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [toast, setToast] = useState<{
     message: string
     type: "success" | "error"
@@ -96,7 +100,7 @@ export function ReviewPage() {
     })
   }
 
-  const toggleAll = () => {
+  const toggleAll = useCallback(() => {
     if (allChecked) {
       setCheckedSet(new Set())
       setExpandedSet(new Set(Array.from({ length: itemCount }, (_, i) => i)))
@@ -104,7 +108,7 @@ export function ReviewPage() {
       setCheckedSet(new Set(Array.from({ length: itemCount }, (_, i) => i)))
       setExpandedSet(new Set())
     }
-  }
+  }, [allChecked, itemCount])
 
   useEffect(() => {
     if (!extractionId) return
@@ -124,7 +128,25 @@ export function ReviewPage() {
         setEditedJson(rawJson)
         if (rawJson) {
           const count = getItemCount(ext.pdf_type ?? "timetable", rawJson)
-          setExpandedSet(new Set(Array.from({ length: count }, (_, i) => i)))
+          const savedIndices = getSavedReviewIndices(rawJson)
+          if (savedIndices) {
+            const restoredSet = new Set(
+              savedIndices.filter(
+                (idx) => typeof idx === "number" && idx >= 0 && idx < count
+              )
+            )
+            setCheckedSet(restoredSet)
+            setExpandedSet(
+              new Set(
+                Array.from({ length: count }, (_, i) => i).filter(
+                  (i) => !restoredSet.has(i)
+                )
+              )
+            )
+          } else {
+            setCheckedSet(new Set())
+            setExpandedSet(new Set(Array.from({ length: count }, (_, i) => i)))
+          }
           setActiveIndex(0)
         }
       }
@@ -141,7 +163,7 @@ export function ReviewPage() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  const handleApprove = async () => {
+  const handleApprove = useCallback(async () => {
     if (!extraction || !editedJson) return
 
     const status = extraction.status ?? "pending"
@@ -174,14 +196,56 @@ export function ReviewPage() {
       setTimeout(() => navigate("/admin"), 1200)
     }
     setActing(false)
-  }
+  }, [extraction, editedJson, allChecked, pdfType, navigate])
+
+  const handleSaveDraft = useCallback(async () => {
+    if (!extraction || !editedJson || savingDraft || acting) return
+
+    setSavingDraft(true)
+    const checkedIndices = Array.from(checkedSet).sort((a, b) => a - b)
+    const result = await saveReviewDraft(
+      extraction.id,
+      editedJson,
+      checkedIndices
+    )
+
+    if (!result.ok) {
+      showToast(
+        "下書き保存に失敗しました: " + (result.error ?? "不明なエラー"),
+        "error"
+      )
+    } else {
+      setEditedJson((prev) =>
+        prev
+          ? {
+              ...prev,
+              _review_state: {
+                checked_indices: checkedIndices,
+                saved_at: new Date().toISOString(),
+              },
+            }
+          : prev
+      )
+      showToast("下書きを保存しました", "success")
+    }
+    setSavingDraft(false)
+  }, [extraction, editedJson, savingDraft, acting, checkedSet])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Allow Cmd+S or Ctrl+S to save draft even when focused in an input
+      if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) {
+        e.preventDefault()
+        if (isReviewable && !savingDraft && !acting && editedJson) {
+          handleSaveDraft()
+        }
+        return
+      }
+
       // Allow Cmd+Enter or Ctrl+Enter even when focused in an input
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault()
-        if (canSubmit) {
+        if (canSubmit && !savingDraft) {
           handleApprove()
         }
         return
@@ -248,9 +312,15 @@ export function ReviewPage() {
     checkedSet,
     canSubmit,
     handleApprove,
+    handleSaveDraft,
+    savingDraft,
+    acting,
+    isReviewable,
+    editedJson,
     navigate,
     showShortcuts,
     allChecked,
+    toggleAll,
   ])
 
   if (loading) {
@@ -370,11 +440,27 @@ export function ReviewPage() {
               <span>戻る</span>
             </Button>
 
+            {/* 下書き保存 button */}
+            {isReviewable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSaveDraft}
+                disabled={savingDraft || acting || !editedJson}
+                className="gap-1 text-xs sm:text-sm"
+                title="編集内容と確認状態を下書きとして保存 (⌘S)"
+              >
+                <IconDeviceFloppy className="size-4" />
+                <span>{savingDraft ? "保存中…" : "下書き保存"}</span>
+              </Button>
+            )}
+
             {/* 承認 button */}
             {isReviewable && (
               <Button
                 onClick={handleApprove}
-                disabled={!canSubmit}
+                disabled={!canSubmit || savingDraft}
                 size="sm"
                 className="text-xs sm:text-sm"
                 title={

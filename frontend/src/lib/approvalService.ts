@@ -63,7 +63,17 @@ export interface RawChange {
   changes?: RawFieldChange[]
 }
 
-export interface TimetableRawJson {
+export interface ReviewState {
+  checked_indices: number[]
+  saved_at: string
+}
+
+export interface BaseRawJson {
+  _review_state?: ReviewState
+  checked_indices?: number[]
+}
+
+export interface TimetableRawJson extends BaseRawJson {
   courses: RawCourse[]
   semester?: string
   is_tentative?: boolean
@@ -71,14 +81,14 @@ export interface TimetableRawJson {
   count?: number
 }
 
-export interface ChangelogRawJson {
+export interface ChangelogRawJson extends BaseRawJson {
   changes: RawChange[]
   semester?: string
   academic_year?: number
   count?: number
 }
 
-export interface AdvanceRawJson {
+export interface AdvanceRawJson extends BaseRawJson {
   names: string[]
   academic_year?: number
   count?: number
@@ -88,6 +98,19 @@ export type ExtractionRawJson =
   | TimetableRawJson
   | ChangelogRawJson
   | AdvanceRawJson
+
+export function getSavedReviewIndices(
+  raw: ExtractionRawJson | null | undefined
+): number[] | null {
+  if (!raw) return null
+  if (Array.isArray(raw._review_state?.checked_indices)) {
+    return raw._review_state.checked_indices
+  }
+  if (Array.isArray(raw.checked_indices)) {
+    return raw.checked_indices
+  }
+  return null
+}
 
 // ---------------------------------------------------------------------------
 // Timetable approval
@@ -223,8 +246,21 @@ async function applyChangelogApproval(
           .eq("id", found.id)
       } else {
         const updates: Record<string, unknown> = {}
+        const fieldMap: Record<string, string> = {
+          "教室": "room",
+          "担当者": "instructors",
+          "科目名": "name",
+          "備考": "notes",
+        }
         for (const fc of change.changes ?? []) {
-          updates[fc.field] = fc.new_value
+          const key = fieldMap[fc.field] ?? fc.field
+          if (key === "instructors") {
+            updates[key] = fc.new_value
+              ? fc.new_value.split(/[,、]/).map((s) => s.trim()).filter(Boolean)
+              : ["未定"]
+          } else {
+            updates[key] = fc.new_value
+          }
         }
         if (Object.keys(updates).length > 0) {
           await supabase
@@ -329,5 +365,40 @@ export async function approveExtraction(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ok: false, count: 0, error: message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Review draft saving
+// ---------------------------------------------------------------------------
+
+export async function saveReviewDraft(
+  extractionId: string,
+  editedJson: ExtractionRawJson,
+  checkedIndices: number[]
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const payload: ExtractionRawJson = {
+      ...editedJson,
+      _review_state: {
+        checked_indices: checkedIndices,
+        saved_at: new Date().toISOString(),
+      },
+    }
+
+    const { error: saveErr } = await supabase
+      .from("extractions")
+      .update({
+        raw_json: payload as unknown as Json,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", extractionId)
+
+    if (saveErr) throw new Error(saveErr.message)
+
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: message }
   }
 }
