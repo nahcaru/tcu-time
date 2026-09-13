@@ -473,9 +473,20 @@ export function ReviewPage() {
           <Card className="flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 shadow-xs">
             <div className="flex shrink-0 items-center justify-between border-b bg-muted/40 px-4 py-2.5">
               <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                抽出データ（編集可）
+                抽出データ
               </span>
               <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setShowShortcuts(true)}
+                  className="gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  title="キーボードショートカット一覧を表示 (?)"
+                >
+                  <IconKeyboard className="size-3.5" />
+                  <Kbd className="h-4 min-w-4 px-1 text-[10px]">?</Kbd>
+                </Button>
                 {requiresChecklist ? (
                   <>
                     <Badge
@@ -502,17 +513,6 @@ export function ReviewPage() {
                     {itemCount} 件
                   </Badge>
                 )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setShowShortcuts(true)}
-                  className="gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  title="キーボードショートカット一覧を表示 (?)"
-                >
-                  <IconKeyboard className="size-3.5" />
-                  <Kbd className="h-4 min-w-4 px-1 text-[10px]">?</Kbd>
-                </Button>
               </div>
             </div>
 
