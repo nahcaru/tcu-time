@@ -489,12 +489,6 @@ export function ReviewPage() {
                 </Button>
                 {requiresChecklist ? (
                   <>
-                    <Badge
-                      variant="outline"
-                      className="text-xs"
-                    >
-                      {checkedSet.size} / {itemCount} 確認済み
-                    </Badge>
                     <Button
                       type="button"
                       variant="ghost"
@@ -504,6 +498,12 @@ export function ReviewPage() {
                     >
                       {allChecked ? "全選択解除" : "全選択"}
                     </Button>
+                    <Badge
+                      variant="outline"
+                      className="text-xs"
+                    >
+                      {checkedSet.size} / {itemCount} 確認済み
+                    </Badge>
                   </>
                 ) : (
                   <Badge
