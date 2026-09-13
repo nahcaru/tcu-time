@@ -66,7 +66,18 @@ def extract_pdf_links(
 
     seen: set[str] = set()
     links: list[PdfLink] = []
+    current_subheading = ""
+
     for sibling in iter_siblings_until(target_h4, {"h4", "hr"}):
+        if sibling.name in {"h5", "h6"} or "■" in sibling.get_text():
+            sub_text = sibling.get_text(strip=True)
+            if "前期" in sub_text and "後期" not in sub_text:
+                current_subheading = "【前期】"
+            elif "後期" in sub_text and "前期" not in sub_text:
+                current_subheading = "【後期】"
+            elif "通年" in sub_text:
+                current_subheading = "【通年】"
+
         anchors = sibling.find_all("a", href=True) if sibling.name != "a" else [sibling]
         for anchor in anchors:
             href = str(anchor["href"])
@@ -83,7 +94,12 @@ def extract_pdf_links(
                 continue
             seen.add(href)
 
-            links.append(PdfLink(url=href, label=f"〈{department}〉{text}"))
+            if current_subheading and "前期" not in text and "後期" not in text:
+                label = f"〈{department}〉{current_subheading}{text}"
+            else:
+                label = f"〈{department}〉{text}"
+
+            links.append(PdfLink(url=href, label=label))
 
     logger.info(
         "Found %d PDF link(s) for '%s' in '%s' section",
@@ -133,7 +149,7 @@ def extract_advance_pdf_links(
     return links
 
 
-def classify_pdf_link(link_text: str) -> PDFMetadata:
+def classify_pdf_link(link_text: str, url: str | None = None) -> PDFMetadata:
     text = link_text.strip()
 
     if "変更一覧" in text or "変更" in text:
@@ -151,10 +167,24 @@ def classify_pdf_link(link_text: str) -> PDFMetadata:
         semester = Semester.SPRING
     elif "後期" in text and "前期" not in text:
         semester = Semester.FALL
+    elif url:
+        match = re.search(r"/20\d{2}/(\d{2})/", url)
+        if match:
+            month = int(match.group(1))
+            if month in {8, 9, 10, 11, 12, 1}:
+                semester = Semester.FALL
+            elif month in {2, 3, 4, 5, 6, 7}:
+                semester = Semester.SPRING
+            else:
+                semester = None
+        else:
+            semester = None
     else:
         semester = None
 
-    return PDFMetadata(pdf_type=pdf_type, semester=semester, is_tentative=False)
+    is_tentative = "予定" in text or "（予定）" in text or "仮" in text
+
+    return PDFMetadata(pdf_type=pdf_type, semester=semester, is_tentative=is_tentative)
 
 
 def extract_academic_year(soup: BeautifulSoup) -> int:

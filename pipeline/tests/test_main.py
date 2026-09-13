@@ -104,6 +104,30 @@ class TestHandleTimetable:
 
     @patch("pipeline.main.update_extraction_status")
     @patch("pipeline.main.extract_courses_from_pdf")
+    def test_auto_corrects_spring_to_fall(
+        self, mock_extract: Mock, mock_update_status: Mock
+    ) -> None:
+        """When input semester_str is spring but courses are fall, auto-correct to fall."""
+        from pipeline.models import Semester
+
+        course1 = Mock(semester=Semester.FALL, model_dump=Mock(return_value={"code": "smba020161", "semester": "fall"}))
+        mock_extract.return_value = [course1]
+
+        _handle_timetable(
+            b"fake pdf",
+            "https://example.com/uploads/2025/09/test.pdf",
+            "ext123",
+            "spring",
+            False,
+            2025,
+        )
+
+        call_kwargs = mock_update_status.call_args[1]
+        assert call_kwargs["semester"] == "fall"
+        assert call_kwargs["raw_json"]["semester"] == "fall"
+
+    @patch("pipeline.main.update_extraction_status")
+    @patch("pipeline.main.extract_courses_from_pdf")
     def test_confirmed_fall_raw_json_includes_semester(
         self, mock_extract: Mock, mock_update_status: Mock
     ) -> None:

@@ -87,9 +87,30 @@ class TestRawToExtractedCourse:
         course = _raw_to_extracted_course(raw, Semester.SPRING)
         assert course is not None
         assert course.code == "smab020161"
+        assert course.term == "前期後"
+        assert course.room == "22A"
         assert len(course.schedules) == 1
         assert course.schedules[0].day == "月"
         assert len(course.targets) == 1
+
+    def test_inferred_term_and_semester_from_code(self) -> None:
+        raw_smba = {"code": "smba080041", "name": "水理学特論", "instructors": ["吉村"]}
+        c_smba = _raw_to_extracted_course(raw_smba)
+        assert c_smba is not None
+        assert c_smba.term == "後期前"
+        assert c_smba.semester == Semester.FALL
+
+        raw_smbz = {"code": "smbz050051", "name": "結晶化学特論", "instructors": ["金友"]}
+        c_smbz = _raw_to_extracted_course(raw_smbz)
+        assert c_smbz is not None
+        assert c_smbz.term == "後集中"
+        assert c_smbz.semester == Semester.FALL
+
+        raw_smaa = {"code": "smaa050061", "name": "コロイド化学特論", "instructors": ["田中"]}
+        c_smaa = _raw_to_extracted_course(raw_smaa)
+        assert c_smaa is not None
+        assert c_smaa.term == "前期前"
+        assert c_smaa.semester == Semester.SPRING
 
     def test_invalid_code_returns_none(self) -> None:
         raw = {

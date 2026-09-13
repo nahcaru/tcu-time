@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase"
 import type { Extraction } from "@/lib/database.types"
 import {
   approveExtraction,
+  inferTerm,
   VALID_DAYS,
   VALID_TERMS,
   VALID_PERIODS,
@@ -206,11 +207,13 @@ function TimetableEditor({
   onChange,
   checkedSet,
   onToggleCheck,
+  extractionSemester,
 }: {
   raw: TimetableRawJson
   onChange: (r: TimetableRawJson) => void
   checkedSet: Set<number>
   onToggleCheck: (index: number, checked: boolean) => void
+  extractionSemester?: string | null
 }) {
   const courses = raw.courses ?? []
 
@@ -221,11 +224,12 @@ function TimetableEditor({
   }
 
   const addCourse = () => {
+    const defaultTerm = extractionSemester === "fall" ? "後期前" : "前期"
     onChange({
       ...raw,
       courses: [
         ...courses,
-        { code: "", name: "", instructors: [""], term: "前期", room: "", schedules: [], targets: [] },
+        { code: "", name: "", instructors: [""], term: defaultTerm, room: "", schedules: [], targets: [] },
       ],
       count: courses.length + 1,
     })
@@ -238,41 +242,43 @@ function TimetableEditor({
 
   return (
     <div className="space-y-4">
-      {courses.map((c, i) => (
-        <CheckboxRow
-          key={i}
-          checked={checkedSet.has(i)}
-          onChange={(v) => onToggleCheck(i, v)}
-          title={`#${i + 1} ${c.name || "（科目名なし）"}`}
-          description={[c.code, c.term, c.room].filter(Boolean).join(" / ")}
-        >
-          <div className="space-y-3 relative">
-            <div className="absolute right-0 -top-1">
-              <RemoveButton onClick={() => removeCourse(i)} />
-            </div>
+      {courses.map((c, i) => {
+        const displayTerm = inferTerm(c, extractionSemester || raw.semester)
+        return (
+          <CheckboxRow
+            key={i}
+            checked={checkedSet.has(i)}
+            onChange={(v) => onToggleCheck(i, v)}
+            title={`#${i + 1} ${c.name || "（科目名なし）"}`}
+            description={[c.code, displayTerm, c.room].filter(Boolean).join(" / ")}
+          >
+            <div className="space-y-3 relative">
+              <div className="absolute right-0 -top-1">
+                <RemoveButton onClick={() => removeCourse(i)} />
+              </div>
 
-            {/* Basic fields */}
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="コード" value={c.code} onChange={(v) => updateCourse(i, { code: v })} />
-              <Field label="科目名" value={c.name} onChange={(v) => updateCourse(i, { name: v })} />
-              <Field
-                label="学年"
-                value={c.year_level ?? 1}
-                onChange={(v) => updateCourse(i, { year_level: Number(v) || 1 })}
-              />
-              <Field
-                label="クラス区分"
-                value={c.class_section ?? ""}
-                onChange={(v) => updateCourse(i, { class_section: v })}
-              />
-              <SelectField
-                label="学期"
-                value={c.term ?? "前期"}
-                options={VALID_TERMS}
-                onChange={(v) => updateCourse(i, { term: v })}
-              />
-              <Field
-                label="教室"
+              {/* Basic fields */}
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="コード" value={c.code} onChange={(v) => updateCourse(i, { code: v })} />
+                <Field label="科目名" value={c.name} onChange={(v) => updateCourse(i, { name: v })} />
+                <Field
+                  label="学年"
+                  value={c.year_level ?? 1}
+                  onChange={(v) => updateCourse(i, { year_level: Number(v) || 1 })}
+                />
+                <Field
+                  label="クラス区分"
+                  value={c.class_section ?? ""}
+                  onChange={(v) => updateCourse(i, { class_section: v })}
+                />
+                <SelectField
+                  label="学期"
+                  value={displayTerm}
+                  options={VALID_TERMS}
+                  onChange={(v) => updateCourse(i, { term: v })}
+                />
+                <Field
+                  label="教室"
                 value={c.room ?? ""}
                 onChange={(v) => updateCourse(i, { room: v })}
               />
@@ -379,7 +385,7 @@ function TimetableEditor({
             </div>
           </div>
         </CheckboxRow>
-      ))}
+      )})}
       <AddRowButton onClick={addCourse} />
     </div>
   )
@@ -643,7 +649,20 @@ export function ReviewPage() {
 
     setActing(true)
 
-    const result = await approveExtraction(extraction.id, pdfType, editedJson)
+    let finalJson = editedJson
+    if (pdfType === "timetable") {
+      const timetableData = editedJson as TimetableRawJson
+      const normalizedCourses = (timetableData.courses ?? []).map((c) => ({
+        ...c,
+        term: inferTerm(c, extraction.semester || timetableData.semester),
+      }))
+      finalJson = {
+        ...timetableData,
+        courses: normalizedCourses,
+      }
+    }
+
+    const result = await approveExtraction(extraction.id, pdfType, finalJson)
 
     if (!result.ok) {
       showToast("承認に失敗しました: " + result.error)
@@ -775,6 +794,7 @@ export function ReviewPage() {
                 onChange={setEditedJson}
                 checkedSet={checkedSet}
                 onToggleCheck={toggleCheck}
+                extractionSemester={extraction.semester}
               />
             ) : pdfType === "changelog" ? (
               <ChangelogEditor

@@ -12,18 +12,10 @@ import type { Database, Json } from "@/lib/database.types"
 // Constants (shared with ReviewPage editors)
 // ---------------------------------------------------------------------------
 
+import { inferTerm, VALID_TERMS, type ValidTerm } from "./termInference"
+
 export const VALID_DAYS = ["月", "火", "水", "木", "金", "土"] as const
-export const VALID_TERMS = [
-  "前期前",
-  "前期後",
-  "前期",
-  "前集中",
-  "後期前",
-  "後期後",
-  "後期",
-  "後集中",
-  "通年",
-] as const
+export { VALID_TERMS, type ValidTerm, inferTerm }
 export const VALID_PERIODS = [1, 2, 3, 4, 5] as const
 export const CHANGE_TYPES = ["create", "update", "delete"] as const
 
@@ -133,7 +125,7 @@ async function applyTimetableApproval(
           extraction_id: extractionId,
           status: "active",
           source_type: "timetable",
-          term: course.term,
+          term: course.term || inferTerm(course, semester),
           room: course.room,
         },
         { onConflict: "code,academic_year" }

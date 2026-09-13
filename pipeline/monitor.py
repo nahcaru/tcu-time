@@ -123,8 +123,8 @@ def compute_hash(data: bytes) -> str:
 # ---------------------------------------------------------------------------
 
 
-def classify_pdf_link(link_text: str) -> PDFMetadata:
-    return _classify_pdf_link(link_text)
+def classify_pdf_link(link_text: str, url: str | None = None) -> PDFMetadata:
+    return _classify_pdf_link(link_text, url=url)
 
 
 # ---------------------------------------------------------------------------

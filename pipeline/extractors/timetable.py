@@ -73,6 +73,34 @@ class TimetableResponse(BaseModel):
     courses: List[RawCourse] = Field(..., description="List of extracted courses")
 
 
+def infer_term_from_code(code: str) -> str | None:
+    """Infer academic term from course code prefix.
+
+    TCU course code structure:
+    - smaa: 前期前 (1Q)
+    - smab: 前期後 (2Q)
+    - smaz: 前集中
+    - smba: 後期前 (3Q)
+    - smbb: 後期後 (4Q)
+    - smbz: 後集中
+    """
+    if len(code) >= 4:
+        prefix = code[:4].lower()
+        if prefix.endswith("aa"):
+            return "前期前"
+        elif prefix.endswith("ab"):
+            return "前期後"
+        elif prefix.endswith("az"):
+            return "前集中"
+        elif prefix.endswith("ba"):
+            return "後期前"
+        elif prefix.endswith("bb"):
+            return "後期後"
+        elif prefix.endswith("bz"):
+            return "後集中"
+    return None
+
+
 def _raw_to_extracted_course(
     raw: dict, semester: Semester | None = None
 ) -> ExtractedCourse | None:
@@ -105,15 +133,26 @@ def _raw_to_extracted_course(
 
     schedules: list[Schedule] = []
     term = str(raw.get("term", "") or "").strip()
+    if not term or term not in VALID_TERMS:
+        inferred = infer_term_from_code(code)
+        if inferred:
+            term = inferred
+
     day = str(raw.get("day", "") or "").strip()
     room = str(raw.get("room", "") or "").strip()
     period_raw = raw.get("period")
 
-    if not semester and term:
-        if term.startswith("前期") or term.startswith("前集中") or term == "通年":
-            semester = Semester.SPRING
-        elif term.startswith("後期") or term.startswith("後集中"):
-            semester = Semester.FALL
+    if not semester:
+        if term:
+            if term.startswith("前期") or term.startswith("前集中") or term == "通年":
+                semester = Semester.SPRING
+            elif term.startswith("後期") or term.startswith("後集中"):
+                semester = Semester.FALL
+        if not semester and len(code) >= 3:
+            if code[2].lower() == "a":
+                semester = Semester.SPRING
+            elif code[2].lower() == "b":
+                semester = Semester.FALL
 
     if raw.get("paired_slots"):
         for slot in raw["paired_slots"]:
@@ -123,16 +162,15 @@ def _raw_to_extracted_course(
                 slot_day in VALID_DAYS
                 and isinstance(slot_period, int)
                 and 1 <= slot_period <= 5
-                and term in VALID_TERMS
             ):
                 schedules.append(
-                    Schedule(term=term, day=slot_day, period=slot_period, room=room)
+                    Schedule(day=slot_day, period=slot_period)
                 )
     elif day and period_raw is not None:
         try:
             period = int(period_raw)
-            if day in VALID_DAYS and 1 <= period <= 5 and term in VALID_TERMS:
-                schedules.append(Schedule(term=term, day=day, period=period, room=room))
+            if day in VALID_DAYS and 1 <= period <= 5:
+                schedules.append(Schedule(day=day, period=period))
         except (ValueError, TypeError):
             pass
 
@@ -144,6 +182,8 @@ def _raw_to_extracted_course(
             year_level=year_level,
             class_section=class_section,
             semester=semester,
+            term=term or None,
+            room=room or None,
             schedules=schedules,
             target_raw=target_raw,
             targets=targets,

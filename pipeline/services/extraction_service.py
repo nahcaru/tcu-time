@@ -25,22 +25,42 @@ def handle_timetable(
         update_extraction_status(extraction_id, "extracted", raw_json={"courses": [], "count": 0})
         return 0
 
+    fall_count = sum(1 for c in courses if getattr(c, "semester", None) == Semester.FALL)
+    spring_count = sum(1 for c in courses if getattr(c, "semester", None) == Semester.SPRING)
+    detected_semester = semester_str
+    if not detected_semester:
+        if fall_count > spring_count:
+            detected_semester = Semester.FALL.value
+        elif spring_count > fall_count:
+            detected_semester = Semester.SPRING.value
+    elif detected_semester == Semester.SPRING.value and fall_count > 0 and spring_count == 0:
+        detected_semester = Semester.FALL.value
+    elif detected_semester == Semester.FALL.value and spring_count > 0 and fall_count == 0:
+        detected_semester = Semester.SPRING.value
+
     courses_data = [c.model_dump() for c in courses]
-    update_extraction_status(
-        extraction_id,
-        "extracted",
-        raw_json={
+    update_kwargs: dict[str, Any] = {
+        "raw_json": {
             "courses": courses_data,
             "count": len(courses),
-            "semester": semester_str,
+            "semester": detected_semester,
             "is_tentative": is_tentative,
             "academic_year": academic_year,
         },
+    }
+    if detected_semester:
+        update_kwargs["semester"] = detected_semester
+
+    update_extraction_status(
+        extraction_id,
+        "extracted",
+        **update_kwargs,
     )
     logger.info(
-        "Timetable extracted: %d courses from %s — awaiting admin approval",
+        "Timetable extracted: %d courses from %s (semester=%s) — awaiting admin approval",
         len(courses),
         pdf_url,
+        detected_semester,
     )
     return len(courses)
 
