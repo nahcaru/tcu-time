@@ -12,6 +12,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
+from pipeline.adapters.gemini import run_with_model_fallback
 from pipeline.config import Config
 from pipeline.models import (
     COURSE_CODE_PATTERN,
@@ -212,9 +213,9 @@ def extract_courses_from_pdf(
         writer.write(single_page_pdf)
         single_page_bytes = single_page_pdf.getvalue()
 
-        try:
-            response = client.models.generate_content(
-                model=Config.GEMINI_MODEL,
+        def _generate_page(model_name: str) -> str:
+            resp = client.models.generate_content(
+                model=model_name,
                 contents=[
                     types.Part.from_bytes(data=single_page_bytes, mime_type="application/pdf"),
                     prompt,
@@ -227,12 +228,19 @@ def extract_courses_from_pdf(
                     response_json_schema=TimetableResponse.model_json_schema(),
                 ),
             )
+            if not resp.text:
+                raise ValueError(f"Gemini response for page {idx + 1} did not include text.")
+            return resp.text
 
-            if not response.text:
-                logger.warning("Gemini response for page %d did not include text.", idx + 1)
-                continue
-
-            parsed = TimetableResponse.model_validate_json(response.text)
+        try:
+            raw_text = run_with_model_fallback(
+                primary_model=Config.GEMINI_MODEL,
+                fallback_model=Config.GEMINI_FALLBACK_MODEL,
+                runner=_generate_page,
+                logger=logger,
+                client=client,
+            )
+            parsed = TimetableResponse.model_validate_json(raw_text)
             for course in parsed.courses:
                 extracted = _raw_to_extracted_course(course.model_dump())
                 if extracted:

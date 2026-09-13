@@ -19,7 +19,7 @@ TIME/
 ├── frontend/        # Vite + React SPA
 ├── pipeline/        # Python data extraction pipeline
 ├── supabase/        # Database migrations & RLS policies
-├── Docs/            # Design documents
+├── docs/            # Design documents
 ├── References/      # Legacy code reference (read-only)
 └── .github/         # CI/CD workflows
 ```

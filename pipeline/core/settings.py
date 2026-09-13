@@ -12,8 +12,10 @@ class Settings:
     SYLLABUS_BASE_URL: str = "https://websrv.tcu.ac.jp/tcu_web_v3"
 
     SCRAPE_DELAY_SEC: float = 3.0
-    GEMINI_MODEL: str = "gemini-3-flash-preview"
-    GEMINI_FALLBACK_MODEL: str = "gemini-3.1-flash-lite-preview"
+    GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+    GEMINI_FALLBACK_MODEL: str = os.environ.get(
+        "GEMINI_FALLBACK_MODEL", "gemini-flash-lite-latest"
+    )
 
     @classmethod
     def validate(cls, required: tuple[str, ...] | None = None) -> None:

@@ -16,6 +16,7 @@ import {
   type ExtractionRawJson,
 } from "@/lib/approvalService"
 import { PageHeader } from "@/components/layout/PageHeader"
+import { ReviewPageSkeleton } from "@/components/admin/AdminSkeleton"
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react"
 
 // =============================================================================
@@ -655,8 +656,11 @@ export function ReviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        読み込み中…
+      <div className="relative flex min-h-full flex-col pb-6">
+        <PageHeader title="抽出レビュー" />
+        <div className="flex min-h-full w-full flex-1 flex-col px-4 pt-14 md:px-6 md:pt-0">
+          <ReviewPageSkeleton />
+        </div>
       </div>
     )
   }

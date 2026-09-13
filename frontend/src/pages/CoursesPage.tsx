@@ -5,7 +5,7 @@ import { CourseCard } from "@/components/course/CourseCard"
 import { CourseDialog } from "@/components/course/CourseDialog"
 import { useCourses } from "@/hooks/use-courses"
 import { useEnrollments } from "@/hooks/use-enrollments"
-import { IconLoader2 } from "@tabler/icons-react"
+import { CourseCardSkeleton } from "@/components/course/CourseCardSkeleton"
 import type { CourseWithRelations } from "@/lib/database.types"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { usePageTutorial } from "@/hooks/use-page-tutorial"
@@ -113,8 +113,13 @@ export function CoursesPage() {
           id="tutorial-course-list"
         >
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="flex flex-col gap-3">
+              <div className="mb-1 text-sm text-muted-foreground">
+                科目を読み込み中…
+              </div>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <CourseCardSkeleton key={i} />
+              ))}
             </div>
           ) : error ? (
             <div className="py-12 text-center text-destructive">
