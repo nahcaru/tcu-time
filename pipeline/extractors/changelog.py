@@ -15,7 +15,7 @@ from pipeline.adapters.gemini import (
     run_with_model_fallback,
 )
 from pipeline.core.settings import Settings
-from pipeline.models import ChangeEntry, FieldChange
+from pipeline.models import ChangeEntry, CourseTarget, FieldChange, Schedule
 
 logger = logging.getLogger(__name__)
 
@@ -85,19 +85,47 @@ def clean_text(s: str | None) -> str:
     return s.strip()
 
 
-def parse_day_period(text: str | None) -> tuple[str | None, int | str | None]:
-    """Parse day of week (月-土) and period (1-5 or 集中) from schedule cell."""
+def parse_schedules(
+    text: str | None,
+) -> tuple[str | None, int | str | None, list[Schedule]]:
+    """Parse day of week (月-土) and period (1-5 or 集中) from schedule cell.
+
+    Supports multiple day/period slots (e.g. "火1,金1", "水1,水2", "月5,木5").
+    Returns (summary_day, primary_period, list_of_schedules).
+    """
     if not text:
-        return None, None
+        return None, None, []
     t = clean_text(text)
     if "集中" in t:
-        return None, "集中"
-    m = re.search(r"([月火水木金土])\s*([1-5])?", t)
-    if not m:
-        return None, None
-    day = m.group(1)
-    period = int(m.group(2)) if m.group(2) else None
-    return day, period
+        return None, "集中", []
+
+    matches = re.findall(r"([月火水木金土])\s*([1-5])", t)
+    schedules: list[Schedule] = []
+    seen: set[tuple[str, int]] = set()
+    for d, p in matches:
+        pair = (d, int(p))
+        if pair not in seen:
+            seen.add(pair)
+            schedules.append(Schedule(day=d, period=int(p)))
+
+    if schedules:
+        unique_days = list(dict.fromkeys(s.day for s in schedules))
+        days = ",".join(unique_days)
+        return days, schedules[0].period, schedules
+
+    m = re.search(r"([月火水木金土])", t)
+    if m:
+        return m.group(1), None, []
+
+    return None, None, []
+
+
+def parse_day_period(text: str | None) -> tuple[str | None, int | str | None]:
+    """Backward-compatible helper returning (first_day, first_period)."""
+    d, p, scheds = parse_schedules(text)
+    if scheds:
+        return scheds[0].day, scheds[0].period
+    return d, p
 
 
 def _detect_headers(row: list[str | None]) -> list[str] | None:
@@ -173,7 +201,7 @@ def _parse_table_row(
         name = strip_del(row_dict.get("科目名", ""))
         term = strip_del(row_dict.get("学期", ""))
         sched_raw = strip_del(row_dict.get("曜日時限", ""))
-        day, period = parse_day_period(sched_raw)
+        day, period, scheds = parse_schedules(sched_raw)
 
         if not name and not code:
             return None
@@ -185,6 +213,7 @@ def _parse_table_row(
             term=term or None,
             day=day,
             period=period,
+            schedules=scheds,
             changes=[],
         )
 
@@ -198,7 +227,24 @@ def _parse_table_row(
         name = strip_new(row_dict.get("科目名", ""))
         term = strip_new(row_dict.get("学期", ""))
         sched_raw = strip_new(row_dict.get("曜日時限", ""))
-        day, period = parse_day_period(sched_raw)
+        day, period, scheds = parse_schedules(sched_raw)
+        room = strip_new(row_dict.get("教室", ""))
+        instr_raw = strip_new(row_dict.get("担当者", ""))
+        instructors = (
+            [x.strip() for x in re.split(r"[,、\n]", instr_raw) if x.strip()]
+            if instr_raw
+            else []
+        )
+        target_raw = strip_new(row_dict.get("受講対象", ""))
+        targets = (
+            [
+                CourseTarget(target_code="", target_name=x.strip())
+                for x in re.split(r"[,、/\n]", target_raw)
+                if x.strip()
+            ]
+            if target_raw
+            else []
+        )
 
         if not name and not code:
             return None
@@ -210,6 +256,10 @@ def _parse_table_row(
             term=term or None,
             day=day,
             period=period,
+            schedules=scheds,
+            instructors=instructors,
+            room=room or None,
+            targets=targets,
             changes=[],
         )
 
@@ -249,7 +299,7 @@ def _parse_table_row(
         name = get_unchanged_or_old("科目名")
         term = get_unchanged_or_old("学期")
         sched_raw = get_unchanged_or_old("曜日時限")
-        day, period = parse_day_period(sched_raw)
+        day, period, scheds = parse_schedules(sched_raw)
 
         if not name and not code:
             return None
@@ -261,6 +311,7 @@ def _parse_table_row(
             term=term or None,
             day=day,
             period=period,
+            schedules=scheds,
             changes=field_changes,
         )
 

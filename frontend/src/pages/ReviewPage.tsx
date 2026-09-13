@@ -358,8 +358,6 @@ export function ReviewPage() {
     )
   }
 
-  const pdfFileName = extraction.pdf_url.split("/").slice(-2).join("/")
-
   const title = `${PDF_TYPE_LABELS[pdfType] ?? pdfType}${
     extraction.semester === "spring"
       ? "（前期）"
@@ -388,12 +386,6 @@ export function ReviewPage() {
         <div className="flex w-full items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
             <StatusBadge status={status} />
-            <span
-              className="hidden max-w-[150px] truncate font-mono text-xs sm:inline-block md:max-w-xs"
-              title={extraction.pdf_url}
-            >
-              {pdfFileName}
-            </span>
           </div>
 
           {/* Action buttons in header */}
@@ -462,14 +454,15 @@ export function ReviewPage() {
                 onClick={handleApprove}
                 disabled={!canSubmit || savingDraft}
                 size="sm"
-                className="text-xs sm:text-sm"
+                className="gap-1 text-xs sm:text-sm"
                 title={
                   requiresChecklist && !allChecked
                     ? "すべての項目にチェックを入れてください"
                     : ""
                 }
               >
-                {acting ? "処理中…" : "承認"}
+                <IconCheck className="size-4" />
+                <span>{acting ? "処理中…" : "承認"}</span>
               </Button>
             )}
           </div>

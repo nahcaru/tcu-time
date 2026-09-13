@@ -53,6 +53,21 @@ export interface RawFieldChange {
   new_value?: string | null
 }
 
+export function parseScheduleString(
+  text: string | null | undefined
+): RawSchedule[] {
+  if (!text) return []
+  const schedules: RawSchedule[] = []
+  const matches = text.matchAll(/([月火水木金土])\s*([1-5])/g)
+  for (const m of matches) {
+    schedules.push({
+      day: m[1],
+      period: Number(m[2]),
+    })
+  }
+  return schedules
+}
+
 export interface RawChange {
   change_type: "create" | "update" | "delete"
   course_code?: string | null
@@ -60,6 +75,10 @@ export interface RawChange {
   term?: string | null
   day?: string | null
   period?: number | string | null
+  schedules?: RawSchedule[]
+  instructors?: string[]
+  room?: string | null
+  targets?: RawTarget[]
   changes?: RawFieldChange[]
 }
 
@@ -209,18 +228,64 @@ async function applyChangelogApproval(
     if (change.change_type === "create") {
       if (!change.course_name) continue
 
-      await supabase.from("courses").upsert(
-        {
-          code: change.course_code ?? "",
-          name: change.course_name,
-          instructors: ["未定"],
-          academic_year: academic_year ?? new Date().getFullYear(),
-          status: "active",
-          source_type: "changelog",
-          extraction_id: extractionId,
-        },
-        { onConflict: "code,academic_year" }
-      )
+      const instructors =
+        change.instructors && change.instructors.length > 0
+          ? change.instructors
+          : ["未定"]
+
+      const { data: courseRow, error: courseErr } = await supabase
+        .from("courses")
+        .upsert(
+          {
+            code: change.course_code ?? "",
+            name: change.course_name,
+            instructors,
+            room: change.room ?? null,
+            term: change.term ?? null,
+            academic_year: academic_year ?? new Date().getFullYear(),
+            status: "active",
+            source_type: "changelog",
+            extraction_id: extractionId,
+          },
+          { onConflict: "code,academic_year" }
+        )
+        .select("id")
+        .single()
+
+      if (courseRow && !courseErr) {
+        const courseId = courseRow.id
+        const schedules =
+          change.schedules && change.schedules.length > 0
+            ? change.schedules
+            : parseScheduleString(
+                [change.day, change.period ? `${change.period}限` : ""]
+                  .filter(Boolean)
+                  .join(" ")
+              )
+
+        if (schedules.length > 0) {
+          await supabase.from("schedules").delete().eq("course_id", courseId)
+          await supabase.from("schedules").insert(
+            schedules.map((s) => ({
+              course_id: courseId,
+              day: s.day,
+              period: s.period,
+            }))
+          )
+        }
+
+        if (change.targets && change.targets.length > 0) {
+          await supabase.from("course_targets").delete().eq("course_id", courseId)
+          await supabase.from("course_targets").insert(
+            change.targets.map((t) => ({
+              course_id: courseId,
+              target_code: t.target_code,
+              target_name: t.target_name,
+              note: t.note ?? "",
+            }))
+          )
+        }
+      }
       count++
     } else if (
       change.change_type === "update" ||
@@ -251,15 +316,54 @@ async function applyChangelogApproval(
           "担当者": "instructors",
           "科目名": "name",
           "備考": "notes",
+          "学期": "term",
+          "開講期": "term",
+          "講義コード": "code",
         }
         for (const fc of change.changes ?? []) {
-          const key = fieldMap[fc.field] ?? fc.field
-          if (key === "instructors") {
-            updates[key] = fc.new_value
-              ? fc.new_value.split(/[,、]/).map((s) => s.trim()).filter(Boolean)
-              : ["未定"]
+          const field = fc.field.trim()
+          if (field === "曜日時限" || field === "時限" || field === "曜日") {
+            const newScheds = parseScheduleString(fc.new_value)
+            if (newScheds.length > 0) {
+              await supabase.from("schedules").delete().eq("course_id", found.id)
+              await supabase.from("schedules").insert(
+                newScheds.map((s) => ({
+                  course_id: found.id,
+                  day: s.day,
+                  period: s.period,
+                }))
+              )
+            }
+          } else if (field === "受講対象") {
+            if (fc.new_value) {
+              const targetList = fc.new_value
+                .split(/[,、/]/)
+                .map((s) => s.trim())
+                .filter(Boolean)
+              if (targetList.length > 0) {
+                await supabase
+                  .from("course_targets")
+                  .delete()
+                  .eq("course_id", found.id)
+                await supabase.from("course_targets").insert(
+                  targetList.map((t) => ({
+                    course_id: found.id,
+                    target_code: "",
+                    target_name: t,
+                    note: "",
+                  }))
+                )
+              }
+            }
           } else {
-            updates[key] = fc.new_value
+            const key = fieldMap[field] ?? field
+            if (key === "instructors") {
+              updates[key] = fc.new_value
+                ? fc.new_value.split(/[,、]/).map((s) => s.trim()).filter(Boolean)
+                : ["未定"]
+            } else {
+              updates[key] = fc.new_value
+            }
           }
         }
         if (Object.keys(updates).length > 0) {

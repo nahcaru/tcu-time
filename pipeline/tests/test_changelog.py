@@ -113,8 +113,11 @@ class TestParseTableRow:
         assert entry.course_code == "smaa100181"
         assert entry.course_name == "機械学習特論"
         assert entry.term == "前期前"
-        assert entry.day == "火"
+        assert entry.day == "火,金"
         assert entry.period == 1
+        assert len(entry.schedules) == 2
+        assert entry.schedules[0].day == "火" and entry.schedules[0].period == 1
+        assert entry.schedules[1].day == "金" and entry.schedules[1].period == 1
         assert len(entry.changes) == 1
         assert entry.changes[0].field == "教室"
         assert entry.changes[0].old_value == "12N"
@@ -220,8 +223,11 @@ class TestParseTableRow:
         assert entry.course_code == "smab030111"
         assert entry.course_name == "プラズマ応用工学特論"
         assert entry.term == "前期後"
-        assert entry.day == "月"
+        assert entry.day == "月,木"
         assert entry.period == 5
+        assert len(entry.schedules) == 2
+        assert entry.schedules[0].day == "月" and entry.schedules[0].period == 5
+        assert entry.schedules[1].day == "木" and entry.schedules[1].period == 5
         assert entry.changes == []
 
     def test_parse_creation_row(self) -> None:
@@ -248,6 +254,13 @@ class TestParseTableRow:
         assert entry.term == "前期前"
         assert entry.day == "水"
         assert entry.period == 1
+        assert len(entry.schedules) == 2
+        assert entry.schedules[0].day == "水" and entry.schedules[0].period == 1
+        assert entry.schedules[1].day == "水" and entry.schedules[1].period == 2
+        assert entry.instructors == ["長沢 敬祐"]
+        assert entry.room == "33G(横浜キャンパス)"
+        assert len(entry.targets) == 1
+        assert entry.targets[0].target_name == "00共通"
         assert entry.changes == []
 
 

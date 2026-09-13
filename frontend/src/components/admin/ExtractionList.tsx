@@ -160,9 +160,6 @@ export function ExtractionList() {
                   年度
                 </TableHead>
                 <TableHead className="font-semibold text-muted-foreground">
-                  PDF URL
-                </TableHead>
-                <TableHead className="font-semibold text-muted-foreground">
                   ステータス
                 </TableHead>
                 <TableHead className="font-semibold text-muted-foreground">
@@ -176,7 +173,6 @@ export function ExtractionList() {
             <TableBody>
               {displayedExtractions.map((ext) => {
                 const status = ext.status ?? "pending"
-                const pdfName = ext.pdf_url.split("/").slice(-2).join("/")
 
                 return (
                   <TableRow
@@ -212,14 +208,6 @@ export function ExtractionList() {
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
                         {ext.academic_year ? `${ext.academic_year}年度` : "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell
-                      className="max-w-[200px] truncate"
-                      title={ext.pdf_url}
-                    >
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {pdfName}
                       </span>
                     </TableCell>
                     <TableCell>

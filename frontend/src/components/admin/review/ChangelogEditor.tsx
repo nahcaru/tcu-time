@@ -1,10 +1,10 @@
 import {
   CHANGE_TYPES,
-  VALID_DAYS,
   VALID_TERMS,
-  VALID_PERIODS,
+  parseScheduleString,
   type RawChange,
   type ChangelogRawJson,
+  type RawSchedule,
 } from "@/lib/approvalService"
 import { Badge } from "@/components/ui/badge"
 import { ReviewItemCard } from "./ReviewItemCard"
@@ -15,6 +15,8 @@ import {
   AddButton,
   DeleteButton,
 } from "./FormControls"
+import { MultiTagInput } from "./MultiTagInput"
+import { ScheduleSlotsInput } from "./ScheduleSlotsInput"
 
 const CHANGE_TYPE_LABEL: Record<string, string> = {
   create: "新規",
@@ -28,6 +30,19 @@ const CHANGE_TYPE_BADGE_STYLE: Record<string, string> = {
   update: "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400",
   delete: "border-destructive/30 bg-destructive/10 text-destructive",
 }
+
+const COMMON_CHANGE_FIELDS = [
+  "教室",
+  "担当者",
+  "曜日時限",
+  "科目名",
+  "学期",
+  "受講対象",
+  "備考",
+  "講義コード",
+  "クラス",
+  "その他",
+] as const
 
 interface ChangelogEditorProps {
   raw: ChangelogRawJson
@@ -77,12 +92,22 @@ export function ChangelogEditor({
   return (
     <div className="space-y-3">
       {changes.map((c, i) => {
-        const subtitle = [
-          c.course_code,
-          c.term,
-          c.day,
-          c.period ? `${c.period}限` : "",
-        ]
+        // Resolve schedules list: either from c.schedules or parsed from day/period
+        const effectiveSchedules: RawSchedule[] =
+          c.schedules && c.schedules.length > 0
+            ? c.schedules
+            : parseScheduleString(
+                [c.day, c.period ? `${c.period}限` : ""]
+                  .filter(Boolean)
+                  .join(" ")
+              )
+
+        const scheduleSummary =
+          effectiveSchedules.length > 0
+            ? effectiveSchedules.map((s) => `${s.day}${s.period}`).join("・")
+            : [c.day, c.period ? `${c.period}限` : ""].filter(Boolean).join("")
+
+        const subtitle = [c.course_code, c.term, scheduleSummary]
           .filter(Boolean)
           .join(" / ")
 
@@ -143,32 +168,56 @@ export function ChangelogEditor({
                   optionLabels={{ "": "指定なし" }}
                   onChange={(v) => updateChange(i, { term: v || null })}
                 />
-                <div className="grid grid-cols-2 gap-2">
-                  <FormSelect
-                    label="曜日"
-                    value={c.day ?? ""}
-                    options={["", ...VALID_DAYS]}
-                    optionLabels={{ "": "指定なし" }}
-                    onChange={(v) => updateChange(i, { day: v || null })}
-                  />
-                  <FormSelect
-                    label="時限"
-                    value={c.period != null ? String(c.period) : ""}
-                    options={["", ...VALID_PERIODS.map(String)]}
-                    optionLabels={{
-                      "": "指定なし",
-                      ...Object.fromEntries(
-                        VALID_PERIODS.map((p) => [String(p), `${p}限`])
-                      ),
-                    }}
-                    onChange={(v) =>
+                <div className="sm:col-span-2">
+                  <ScheduleSlotsInput
+                    label="曜日・時限（複数コマ対応）"
+                    schedules={effectiveSchedules}
+                    onChange={(newScheds) => {
+                      const summaryDay = newScheds.map((s) => s.day).join(",")
+                      const firstPeriod = newScheds[0]?.period ?? null
                       updateChange(i, {
-                        period: v ? Number(v) || v : null,
+                        schedules: newScheds,
+                        day: summaryDay || null,
+                        period: firstPeriod,
                       })
-                    }
+                    }}
                   />
                 </div>
               </div>
+
+              {/* Extra fields for create type */}
+              {c.change_type === "create" && (
+                <div className="space-y-3 rounded-lg border bg-muted/10 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground">
+                    新規科目の詳細情報
+                  </div>
+                  <FormField
+                    label="教室"
+                    value={c.room ?? ""}
+                    placeholder="33G（横浜キャンパス）"
+                    onChange={(v) => updateChange(i, { room: v || null })}
+                  />
+                  <MultiTagInput
+                    label="担当教員"
+                    values={c.instructors ?? []}
+                    onChange={(vals) => updateChange(i, { instructors: vals })}
+                    placeholder="教員名を入力して Enter（貼り付け可）"
+                  />
+                  <MultiTagInput
+                    label="受講対象"
+                    values={(c.targets ?? []).map((t) => t.target_name || t.target_code)}
+                    onChange={(vals) =>
+                      updateChange(i, {
+                        targets: vals.map((name) => ({
+                          target_code: "",
+                          target_name: name,
+                        })),
+                      })
+                    }
+                    placeholder="受講対象を入力して Enter（例: 00共通）"
+                  />
+                </div>
+              )}
 
               {/* Field changes (for update type) */}
               {c.change_type === "update" && (
@@ -177,63 +226,175 @@ export function ChangelogEditor({
                     title="変更項目"
                     count={(c.changes ?? []).length}
                   />
-                  <div className="space-y-2">
-                    {(c.changes ?? []).map((fc, fi) => (
-                      <div
-                        key={fi}
-                        className="grid grid-cols-1 items-end gap-2 rounded-lg border bg-muted/20 p-2.5 sm:grid-cols-3"
-                      >
-                        <FormField
-                          label="フィールド名"
-                          value={fc.field}
-                          placeholder="教室, 時間割など"
-                          onChange={(v) => {
-                            const fcs = [...(c.changes ?? [])]
-                            fcs[fi] = { ...fcs[fi], field: v }
-                            updateChange(i, { changes: fcs })
-                          }}
-                        />
-                        <FormField
-                          label="変更前"
-                          value={fc.old_value ?? ""}
-                          placeholder="旧データ"
-                          onChange={(v) => {
-                            const fcs = [...(c.changes ?? [])]
-                            fcs[fi] = { ...fcs[fi], old_value: v || null }
-                            updateChange(i, { changes: fcs })
-                          }}
-                        />
-                        <div className="flex items-end gap-1.5">
-                          <FormField
-                            label="変更後"
-                            value={fc.new_value ?? ""}
-                            placeholder="新データ"
-                            onChange={(v) => {
-                              const fcs = [...(c.changes ?? [])]
-                              fcs[fi] = { ...fcs[fi], new_value: v || null }
-                              updateChange(i, { changes: fcs })
-                            }}
-                            className="flex-1"
-                          />
-                          <DeleteButton
-                            onClick={() => {
-                              updateChange(i, {
-                                changes: (c.changes ?? []).filter(
-                                  (_, idx) => idx !== fi
-                                ),
-                              })
-                            }}
-                          />
+                  <div className="space-y-2.5">
+                    {(c.changes ?? []).map((fc, fi) => {
+                      const isMultiTagField =
+                        fc.field === "担当者" || fc.field === "受講対象"
+
+                      const options = Array.from(
+                        new Set([
+                          ...COMMON_CHANGE_FIELDS,
+                          ...(fc.field ? [fc.field] : []),
+                        ])
+                      )
+
+                      const splitValues = (str: string | null | undefined) =>
+                        str
+                          ? str
+                              .split(/[,、\n]/)
+                              .map((s) => s.trim())
+                              .filter(Boolean)
+                          : []
+
+                      return (
+                        <div
+                          key={fi}
+                          className="rounded-lg border bg-muted/20 p-3 space-y-2.5"
+                        >
+                          <div className="flex items-end justify-between gap-2">
+                            <div className="w-48 shrink-0">
+                              <FormSelect
+                                label="変更項目"
+                                value={
+                                  COMMON_CHANGE_FIELDS.includes(
+                                    fc.field as (typeof COMMON_CHANGE_FIELDS)[number]
+                                  )
+                                    ? fc.field
+                                    : fc.field
+                                      ? fc.field
+                                      : "教室"
+                                }
+                                options={options}
+                                onChange={(v) => {
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = { ...fcs[fi], field: v === "その他" ? "" : v }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                              />
+                            </div>
+                            {(!COMMON_CHANGE_FIELDS.includes(
+                              fc.field as (typeof COMMON_CHANGE_FIELDS)[number]
+                            ) ||
+                              fc.field === "") && (
+                              <FormField
+                                label="カスタム項目名"
+                                value={fc.field}
+                                placeholder="項目名を入力"
+                                onChange={(v) => {
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = { ...fcs[fi], field: v }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                                className="flex-1"
+                              />
+                            )}
+                            <DeleteButton
+                              onClick={() => {
+                                updateChange(i, {
+                                  changes: (c.changes ?? []).filter(
+                                    (_, idx) => idx !== fi
+                                  ),
+                                })
+                              }}
+                            />
+                          </div>
+
+                          {isMultiTagField ? (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <MultiTagInput
+                                label={`${fc.field}（変更前）`}
+                                values={splitValues(fc.old_value)}
+                                onChange={(vals) => {
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = {
+                                    ...fcs[fi],
+                                    old_value: vals.join(", ") || null,
+                                  }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                                placeholder="変更前の値（Enterで追加）"
+                              />
+                              <MultiTagInput
+                                label={`${fc.field}（変更後）`}
+                                values={splitValues(fc.new_value)}
+                                onChange={(vals) => {
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = {
+                                    ...fcs[fi],
+                                    new_value: vals.join(", ") || null,
+                                  }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                                placeholder="変更後の値（Enterで追加）"
+                              />
+                            </div>
+                          ) : fc.field === "曜日時限" ? (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <ScheduleSlotsInput
+                                label="変更前コマ"
+                                schedules={parseScheduleString(fc.old_value)}
+                                onChange={(scheds) => {
+                                  const text = scheds
+                                    .map((s) => `${s.day}${s.period}`)
+                                    .join(",")
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = {
+                                    ...fcs[fi],
+                                    old_value: text || null,
+                                  }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                              />
+                              <ScheduleSlotsInput
+                                label="変更後コマ"
+                                schedules={parseScheduleString(fc.new_value)}
+                                onChange={(scheds) => {
+                                  const text = scheds
+                                    .map((s) => `${s.day}${s.period}`)
+                                    .join(",")
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = {
+                                    ...fcs[fi],
+                                    new_value: text || null,
+                                  }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <FormField
+                                label="変更前"
+                                value={fc.old_value ?? ""}
+                                placeholder="旧データ"
+                                onChange={(v) => {
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = { ...fcs[fi], old_value: v || null }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                              />
+                              <FormField
+                                label="変更後"
+                                value={fc.new_value ?? ""}
+                                placeholder="新データ"
+                                onChange={(v) => {
+                                  const fcs = [...(c.changes ?? [])]
+                                  fcs[fi] = { ...fcs[fi], new_value: v || null }
+                                  updateChange(i, { changes: fcs })
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <AddButton
                     onClick={() => {
                       updateChange(i, {
                         changes: [
                           ...(c.changes ?? []),
-                          { field: "", old_value: null, new_value: null },
+                          { field: "教室", old_value: null, new_value: null },
                         ],
                       })
                     }}

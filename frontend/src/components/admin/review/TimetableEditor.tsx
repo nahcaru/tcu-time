@@ -15,6 +15,7 @@ import {
   AddButton,
   DeleteButton,
 } from "./FormControls"
+import { MultiTagInput } from "./MultiTagInput"
 
 interface TimetableEditorProps {
   raw: TimetableRawJson
@@ -157,45 +158,11 @@ export function TimetableEditor({
 
             {/* Instructors */}
             <div className="space-y-2">
-              <FormSectionHeader
-                title="担当教員"
-                count={(c.instructors ?? []).length}
-              />
-              <div className="space-y-1.5">
-                {(c.instructors ?? [""]).map((instr, ii) => (
-                  <div key={ii} className="flex items-center gap-2">
-                    <FormField
-                      label=""
-                      value={instr}
-                      placeholder="教員名"
-                      onChange={(v) => {
-                        const arr = [...(c.instructors ?? [""])]
-                        arr[ii] = v
-                        updateCourse(i, { instructors: arr })
-                      }}
-                      className="flex-1"
-                    />
-                    {(c.instructors ?? []).length > 1 && (
-                      <DeleteButton
-                        onClick={() => {
-                          updateCourse(i, {
-                            instructors: (c.instructors ?? []).filter(
-                              (_, idx) => idx !== ii
-                            ),
-                          })
-                        }}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <AddButton
-                onClick={() => {
-                  updateCourse(i, {
-                    instructors: [...(c.instructors ?? []), ""],
-                  })
-                }}
-                label="教員を追加"
+              <MultiTagInput
+                label="担当教員"
+                values={c.instructors ?? []}
+                onChange={(vals) => updateCourse(i, { instructors: vals })}
+                placeholder="教員名を入力して Enter（貼り付け可）"
               />
             </div>
 

@@ -97,6 +97,31 @@ class FieldChange(BaseModel):
         return str(v)
 
 
+class Schedule(BaseModel):
+    day: str
+    period: int
+
+    @field_validator("day")
+    @classmethod
+    def validate_day(cls, v: str) -> str:
+        if v not in VALID_DAYS:
+            raise ValueError(f"Invalid day: {v}. Must be one of {VALID_DAYS}")
+        return v
+
+    @field_validator("period")
+    @classmethod
+    def validate_period(cls, v: int) -> int:
+        if not 1 <= v <= 5:
+            raise ValueError(f"Invalid period: {v}. Must be 1-5")
+        return v
+
+
+class CourseTarget(BaseModel):
+    target_code: str
+    target_name: str
+    note: str = ""
+
+
 class ChangeEntry(BaseModel):
     """A single entry from a changelog PDF."""
 
@@ -106,6 +131,10 @@ class ChangeEntry(BaseModel):
     term: str | None = None
     day: str | None = None
     period: int | str | None = None
+    schedules: list[Schedule] = []
+    instructors: list[str] = []
+    room: str | None = None
+    targets: list[CourseTarget] = []
     changes: list[FieldChange] = []
 
     @field_validator("change_type", mode="before")
@@ -135,36 +164,6 @@ class ChangeEntry(BaseModel):
             return int(s)
         except ValueError:
             return s
-
-
-# ---------------------------------------------------------------------------
-# Course data models (Gemini extraction output)
-# ---------------------------------------------------------------------------
-
-
-class Schedule(BaseModel):
-    day: str
-    period: int
-
-    @field_validator("day")
-    @classmethod
-    def validate_day(cls, v: str) -> str:
-        if v not in VALID_DAYS:
-            raise ValueError(f"Invalid day: {v}. Must be one of {VALID_DAYS}")
-        return v
-
-    @field_validator("period")
-    @classmethod
-    def validate_period(cls, v: int) -> int:
-        if not 1 <= v <= 5:
-            raise ValueError(f"Invalid period: {v}. Must be 1-5")
-        return v
-
-
-class CourseTarget(BaseModel):
-    target_code: str
-    target_name: str
-    note: str = ""
 
 
 class ExtractedCourse(BaseModel):
