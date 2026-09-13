@@ -202,7 +202,7 @@ export function ChangelogEditor({
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FormField
-                      label="科目コード"
+                      label="講義コード"
                       value={c.course_code ?? ""}
                       placeholder="smba010011"
                       onChange={(v) =>
@@ -226,7 +226,7 @@ export function ChangelogEditor({
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <FormField
-                        label="科目コード"
+                        label="講義コード"
                         value={c.course_code ?? ""}
                         placeholder="smba010011"
                         onChange={(v) =>
