@@ -472,19 +472,11 @@ export function ReviewPage() {
           {/* Right: Editable extracted data Card */}
           <Card className="flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 shadow-xs">
             <div className="flex shrink-0 items-center justify-between border-b bg-muted/40 px-4 py-2.5">
+              <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                抽出データ（編集可）
+              </span>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                  抽出データ（編集可）
-                </span>
-                <Badge
-                  variant="secondary"
-                  className="h-5 px-1.5 text-[11px] font-normal"
-                >
-                  {itemCount} 件
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                {requiresChecklist && (
+                {requiresChecklist ? (
                   <>
                     <Badge
                       variant="outline"
@@ -502,6 +494,13 @@ export function ReviewPage() {
                       {allChecked ? "全選択解除" : "全選択"}
                     </Button>
                   </>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="text-xs"
+                  >
+                    {itemCount} 件
+                  </Badge>
                 )}
                 <Button
                   type="button"
