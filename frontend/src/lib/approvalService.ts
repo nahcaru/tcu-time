@@ -203,66 +203,98 @@ async function applyTimetableApproval(
       .eq("is_tentative", true)
   }
 
-  let count = 0
+  const year = academic_year ?? new Date().getFullYear()
+
+  // 1. Prepare all course rows
+  const coursePayloads = courses.map((course) => ({
+    code: course.code,
+    name: course.name,
+    instructors: course.instructors,
+    year_level: course.year_level ?? 1,
+    class_section: course.class_section ?? "",
+    notes: course.notes ?? "",
+    academic_year: year,
+    is_tentative,
+    extraction_id: extractionId,
+    status: "active",
+    source_type: "timetable",
+    term: inferTerm(course, semester),
+    room: course.room,
+  }))
+
+  if (coursePayloads.length === 0) {
+    return { count: 0, replayedChangelogs: 0, replayedAdvanceEnrollments: 0 }
+  }
+
+  // 2. Bulk upsert courses in a single call
+  const { data: upsertedRows, error: upsertErr } = await supabase
+    .from("courses")
+    .upsert(coursePayloads, { onConflict: "code,academic_year" })
+    .select("id, code")
+
+  if (upsertErr || !upsertedRows) {
+    console.error("Bulk course upsert failed:", upsertErr)
+    throw new Error(upsertErr?.message ?? "Bulk course upsert failed")
+  }
+
+  const codeToId = new Map(upsertedRows.map((r) => [r.code, r.id]))
+  const allCourseIds = upsertedRows.map((r) => r.id)
+
+  // 3. Prepare all schedules and targets
+  const allSchedules: Array<{ course_id: string; day: string; period: number }> = []
+  const allTargets: Array<{
+    course_id: string
+    target_code: string
+    target_name: string
+    note: string
+  }> = []
 
   for (const course of courses) {
-    const { data: courseRow, error: courseErr } = await supabase
-      .from("courses")
-      .upsert(
-        {
-          code: course.code,
-          name: course.name,
-          instructors: course.instructors,
-          year_level: course.year_level ?? 1,
-          class_section: course.class_section ?? "",
-          notes: course.notes ?? "",
-          academic_year: academic_year ?? new Date().getFullYear(),
-          is_tentative,
-          extraction_id: extractionId,
-          status: "active",
-          source_type: "timetable",
-          term: course.term || inferTerm(course, semester),
-          room: course.room,
-        },
-        { onConflict: "code,academic_year" }
-      )
-      .select("id")
-      .single()
+    const courseId = codeToId.get(course.code)
+    if (!courseId) continue
 
-    if (courseErr || !courseRow) {
-      console.error("course upsert failed:", courseErr, course.code)
-      continue
-    }
-
-    const courseId = courseRow.id
-
-    // Replace schedules — term and room come from course level
-    await supabase.from("schedules").delete().eq("course_id", courseId)
     if (course.schedules && course.schedules.length > 0) {
-      await supabase.from("schedules").insert(
-        course.schedules.map((s) => ({
+      for (const s of course.schedules) {
+        allSchedules.push({
           course_id: courseId,
           day: s.day,
           period: s.period,
-        }))
-      )
+        })
+      }
     }
 
-    // Replace targets
-    await supabase.from("course_targets").delete().eq("course_id", courseId)
     if (course.targets && course.targets.length > 0) {
-      await supabase.from("course_targets").insert(
-        course.targets.map((t) => ({
+      for (const t of course.targets) {
+        allTargets.push({
           course_id: courseId,
           target_code: t.target_code,
           target_name: t.target_name,
           note: t.note ?? "",
-        }))
-      )
+        })
+      }
     }
-
-    count++
   }
+
+  // 4. In parallel, delete previous schedules/targets and bulk insert new ones
+  if (allCourseIds.length > 0) {
+    await Promise.all([
+      supabase.from("schedules").delete().in("course_id", allCourseIds),
+      supabase.from("course_targets").delete().in("course_id", allCourseIds),
+    ])
+
+    const insertPromises = []
+    if (allSchedules.length > 0) {
+      insertPromises.push(supabase.from("schedules").insert(allSchedules))
+    }
+    if (allTargets.length > 0) {
+      insertPromises.push(supabase.from("course_targets").insert(allTargets))
+    }
+    if (insertPromises.length > 0) {
+      await Promise.all(insertPromises)
+    }
+  }
+
+  const count = upsertedRows.length
 
   // Auto-replay approved changelogs for this academic year & semester
   // so timetable approvals (including 2nd edition or late approvals)
@@ -527,32 +559,39 @@ async function applyAdvanceApproval(
   const { names = [], academic_year } = raw
   const year = academic_year ?? new Date().getFullYear()
 
+  // Reset advance_enrollment flag for courses in this year
   await supabase
     .from("courses")
     .update({ advance_enrollment: false })
     .eq("academic_year", year)
     .eq("advance_enrollment", true)
 
-  let count = 0
-  for (const name of names) {
-    const { data: matches } = await supabase
-      .from("courses")
-      .select("id")
-      .eq("academic_year", year)
-      .eq("status", "active")
-      .ilike("name", name)
+  if (names.length === 0) return 0
 
-    if (matches && matches.length > 0) {
-      const ids = matches.map((m) => m.id)
-      await supabase
-        .from("courses")
-        .update({ advance_enrollment: true })
-        .in("id", ids)
-      count += ids.length
-    }
+  // Bulk query all active courses for the academic year to match names in memory
+  const { data: courses, error } = await supabase
+    .from("courses")
+    .select("id, name")
+    .eq("academic_year", year)
+    .eq("status", "active")
+
+  if (error || !courses || courses.length === 0) {
+    return 0
   }
 
-  return count
+  const nameSet = new Set(names.map((n) => n.trim().toLowerCase()))
+  const matchedIds = courses
+    .filter((c) => nameSet.has(c.name.trim().toLowerCase()))
+    .map((c) => c.id)
+
+  if (matchedIds.length > 0) {
+    await supabase
+      .from("courses")
+      .update({ advance_enrollment: true })
+      .in("id", matchedIds)
+  }
+
+  return matchedIds.length
 }
 
 // ---------------------------------------------------------------------------

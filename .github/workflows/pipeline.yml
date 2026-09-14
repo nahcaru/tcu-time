@@ -13,6 +13,9 @@ jobs:
   pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
     defaults:
       run:
         working-directory: pipeline
@@ -20,6 +23,8 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
       PYTHONPATH: ${{ github.workspace }}
 
     steps:

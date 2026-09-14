@@ -48,6 +48,7 @@ export function ExtractionList() {
   const [extractions, setExtractions] = useState<Extraction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<StatusFilter>("extracted")
+  const [latestYearOnly, setLatestYearOnly] = useState(true)
   const [latestOnly, setLatestOnly] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,23 +78,37 @@ export function ExtractionList() {
     fetchData()
   }, [filter])
 
-  // Solely list the latest of each document type when latestOnly is true
+  // Identify latest academic year present in extractions
+  const maxYear = useMemo(() => {
+    return extractions.reduce((max, ext) => {
+      if (ext.academic_year && ext.academic_year > max) return ext.academic_year
+      return max
+    }, 0)
+  }, [extractions])
+
+  // Filter by latest year and/or latest of each document identity
   const displayedExtractions = useMemo(() => {
-    if (!latestOnly) return extractions
+    let list = extractions
+
+    if (latestYearOnly && maxYear > 0) {
+      list = list.filter((ext) => ext.academic_year === maxYear)
+    }
+
+    if (!latestOnly) return list
 
     const seen = new Set<string>()
-    return extractions.filter((ext) => {
-      // Group by document identity: (pdf_type, semester)
-      const docKey = `${ext.pdf_type ?? "unknown"}_${ext.semester ?? "all"}`
+    return list.filter((ext) => {
+      // Group by document identity: (academic_year, pdf_type, semester)
+      const docKey = `${ext.academic_year ?? "any"}_${ext.pdf_type ?? "unknown"}_${ext.semester ?? "all"}`
       if (seen.has(docKey)) return false
       seen.add(docKey)
       return true
     })
-  }, [extractions, latestOnly])
+  }, [extractions, latestYearOnly, maxYear, latestOnly])
 
   return (
     <div className="space-y-4">
-      {/* Filter tabs and Latest Only Toggle */}
+      {/* Filter tabs and Latest Only / Latest Year Toggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs
           value={filter}
@@ -108,23 +123,40 @@ export function ExtractionList() {
           </TabsList>
         </Tabs>
 
-        {/* Latest Only Toggle */}
-        <Button
-          type="button"
-          variant={latestOnly ? "secondary" : "outline"}
-          size="sm"
-          onClick={() => setLatestOnly((prev) => !prev)}
-          className="w-fit gap-2 text-xs font-medium"
-        >
-          <Checkbox
-            checked={latestOnly}
-            className="pointer-events-none size-3.5"
-          />
-          <span>各書類の最新版のみ表示</span>
-          <span className="text-[11px] text-muted-foreground">
-            ({displayedExtractions.length} / {extractions.length}件)
-          </span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Latest Year Only Toggle */}
+          <Button
+            type="button"
+            variant={latestYearOnly ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setLatestYearOnly((prev) => !prev)}
+            className="w-fit gap-2 text-xs font-medium"
+          >
+            <Checkbox
+              checked={latestYearOnly}
+              className="pointer-events-none size-3.5"
+            />
+            <span>最新年度のみ{maxYear ? ` (${maxYear}年度)` : ""}</span>
+          </Button>
+
+          {/* Latest Only Toggle */}
+          <Button
+            type="button"
+            variant={latestOnly ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setLatestOnly((prev) => !prev)}
+            className="w-fit gap-2 text-xs font-medium"
+          >
+            <Checkbox
+              checked={latestOnly}
+              className="pointer-events-none size-3.5"
+            />
+            <span>最新版のみ</span>
+            <span className="text-[11px] text-muted-foreground">
+              ({displayedExtractions.length} / {extractions.length}件)
+            </span>
+          </Button>
+        </div>
       </div>
 
       {/* Loading state */}

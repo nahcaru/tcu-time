@@ -21,7 +21,7 @@ export function CourseFieldsEditor({
   extractionSemester,
   className,
 }: CourseFieldsEditorProps) {
-  const displayTerm = c.term || inferTerm(c, extractionSemester)
+  const displayTerm = inferTerm(c, extractionSemester)
 
   const update = (patch: Partial<RawCourse>) => {
     onChange({ ...c, ...patch })

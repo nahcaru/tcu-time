@@ -106,11 +106,61 @@ class TestRawToExtractedCourse:
         assert c_smbz.term == "後集中"
         assert c_smbz.semester == Semester.FALL
 
+        # smbz with regular schedule -> 後期
+        raw_smbz_sched = {
+            "code": "smbz010041",
+            "name": "流体力学特論",
+            "instructors": ["佐藤"],
+            "day": "火",
+            "period": 1,
+        }
+        c_smbz_sched = _raw_to_extracted_course(raw_smbz_sched)
+        assert c_smbz_sched is not None
+        assert c_smbz_sched.term == "後期"
+        assert c_smbz_sched.semester == Semester.FALL
+
         raw_smaa = {"code": "smaa050061", "name": "コロイド化学特論", "instructors": ["田中"]}
         c_smaa = _raw_to_extracted_course(raw_smaa)
         assert c_smaa is not None
         assert c_smaa.term == "前期前"
         assert c_smaa.semester == Semester.SPRING
+
+        # smaz with regular schedule -> 前期
+        raw_smaz_sched = {
+            "code": "smaz060011",
+            "name": "原子炉物理学特論",
+            "instructors": ["山路"],
+            "day": "火",
+            "period": 2,
+        }
+        c_smaz_sched = _raw_to_extracted_course(raw_smaz_sched)
+        assert c_smaz_sched is not None
+        assert c_smaz_sched.term == "前期"
+        assert c_smaz_sched.semester == Semester.SPRING
+
+        # False intensive term corrected when regular schedule exists
+        raw_false_intensive = {
+            "code": "smaz060011",
+            "name": "原子炉物理学特論",
+            "instructors": ["山路"],
+            "term": "前集中",
+            "day": "火",
+            "period": 2,
+        }
+        c_fixed = _raw_to_extracted_course(raw_false_intensive)
+        assert c_fixed is not None
+        assert c_fixed.term == "前期"
+
+        # Preserves 通年
+        raw_tsunen = {
+            "code": "smaz060271",
+            "name": "原子炉実習",
+            "instructors": ["田中"],
+            "term": "通年",
+        }
+        c_tsunen = _raw_to_extracted_course(raw_tsunen)
+        assert c_tsunen is not None
+        assert c_tsunen.term == "通年"
 
     def test_invalid_code_returns_none(self) -> None:
         raw = {

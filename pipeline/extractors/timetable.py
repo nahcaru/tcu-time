@@ -73,16 +73,21 @@ class TimetableResponse(BaseModel):
     courses: List[RawCourse] = Field(..., description="List of extracted courses")
 
 
-def infer_term_from_code(code: str) -> str | None:
-    """Infer academic term from course code prefix.
+def infer_term_from_code(
+    code: str,
+    day: str | None = None,
+    period: int | None = None,
+    has_paired_slots: bool = False,
+) -> str | None:
+    """Infer academic term from course code prefix and schedule presence.
 
     TCU course code structure:
     - smaa: 前期前 (1Q)
     - smab: 前期後 (2Q)
-    - smaz: 前集中
+    - smaz: 前期 (if regular weekly schedule exists) or 前集中 (if no weekly slots)
     - smba: 後期前 (3Q)
     - smbb: 後期後 (4Q)
-    - smbz: 後集中
+    - smbz: 後期 (if regular weekly schedule exists) or 後集中 (if no weekly slots)
     """
     if len(code) >= 4:
         prefix = code[:4].lower()
@@ -91,13 +96,19 @@ def infer_term_from_code(code: str) -> str | None:
         elif prefix.endswith("ab"):
             return "前期後"
         elif prefix.endswith("az"):
-            return "前集中"
+            has_regular = has_paired_slots or (
+                bool(day) and day != "-" and period is not None and 1 <= period <= 5
+            )
+            return "前期" if has_regular else "前集中"
         elif prefix.endswith("ba"):
             return "後期前"
         elif prefix.endswith("bb"):
             return "後期後"
         elif prefix.endswith("bz"):
-            return "後集中"
+            has_regular = has_paired_slots or (
+                bool(day) and day != "-" and period is not None and 1 <= period <= 5
+            )
+            return "後期" if has_regular else "後集中"
     return None
 
 
@@ -131,16 +142,39 @@ def _raw_to_extracted_course(
                 )
             )
 
-    schedules: list[Schedule] = []
-    term = str(raw.get("term", "") or "").strip()
-    if not term or term not in VALID_TERMS:
-        inferred = infer_term_from_code(code)
-        if inferred:
-            term = inferred
-
     day = str(raw.get("day", "") or "").strip()
     room = str(raw.get("room", "") or "").strip()
     period_raw = raw.get("period")
+    period_int: int | None = None
+    if period_raw is not None:
+        try:
+            period_int = int(period_raw)
+        except (ValueError, TypeError):
+            pass
+
+    has_paired = bool(raw.get("paired_slots"))
+    has_regular_sched = has_paired or (
+        bool(day) and day in VALID_DAYS and period_int is not None and 1 <= period_int <= 5
+    )
+
+    schedules: list[Schedule] = []
+    term = str(raw.get("term", "") or "").strip()
+    if term in VALID_TERMS:
+        # Correct false intensive term when regular weekly schedule exists
+        if has_regular_sched:
+            if term == "前集中":
+                term = "前期"
+            elif term == "後集中":
+                term = "後期"
+    else:
+        inferred = infer_term_from_code(
+            code,
+            day=day,
+            period=period_int,
+            has_paired_slots=has_paired,
+        )
+        if inferred:
+            term = inferred
 
     if not semester:
         if term:
@@ -166,13 +200,9 @@ def _raw_to_extracted_course(
                 schedules.append(
                     Schedule(day=slot_day, period=slot_period)
                 )
-    elif day and period_raw is not None:
-        try:
-            period = int(period_raw)
-            if day in VALID_DAYS and 1 <= period <= 5:
-                schedules.append(Schedule(day=day, period=period))
-        except (ValueError, TypeError):
-            pass
+    elif day and period_int is not None:
+        if day in VALID_DAYS and 1 <= period_int <= 5:
+            schedules.append(Schedule(day=day, period=period_int))
 
     try:
         return ExtractedCourse(
@@ -238,6 +268,10 @@ def extract_courses_from_pdf(
 
 ルール:
 - 結合セル（曜日・時限・学期・年クラスが空欄）は直前の行の値を引き継いでください
+- 学期（term）は PDF の「学期」列の値を正確に抽出してください。
+  有効な学期: 「前期前」「前期後」「前期」「前集中」「後期前」「後期後」「後期」「後集中」「通年」
+  ※ 曜日・時限がある通常の講義（例: 火2, 木3 等）で学期セルが空欄（結合セル）の場合、決して「前集中」「後集中」とせず、直前の学期（通常は「前期」または「後期」）を引き継いでください。
+  ※「前集中」「後集中」は、定期的な曜日・時限のない集中講義のみに適用されます。
 - 「対開講(月1,木1)」のような記述がある場合は paired_slots に全スロットをリストアップしてください
 - 受講対象は target_raw に原文を、targets に構造化した情報を入れてください
 - instructors が複数の場合は配列に分けてください

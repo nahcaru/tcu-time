@@ -190,16 +190,13 @@ describe("replayApprovedAdvanceEnrollment", () => {
           }),
           select: () => ({
             eq: () => ({
-              eq: () => ({
-                ilike: (_col: string, name: string) => {
-                  if (name === "機械学習特論") {
-                    return Promise.resolve({ data: [{ id: "c-ml-1" }, { id: "c-ml-2" }], error: null })
-                  }
-                  if (name === "情報セキュリティ特論") {
-                    return Promise.resolve({ data: [{ id: "c-sec-1" }], error: null })
-                  }
-                  return Promise.resolve({ data: [], error: null })
-                },
+              eq: () => Promise.resolve({
+                data: [
+                  { id: "c-ml-1", name: "機械学習特論" },
+                  { id: "c-ml-2", name: "機械学習特論" },
+                  { id: "c-sec-1", name: "情報セキュリティ特論" },
+                ],
+                error: null,
               }),
             }),
           }),
@@ -274,9 +271,7 @@ describe("approveExtraction with Timetable auto-replay", () => {
       if (table === "courses") {
         return {
           upsert: () => ({
-            select: () => ({
-              single: () => Promise.resolve({ data: { id: "c-1" }, error: null }),
-            }),
+            select: () => Promise.resolve({ data: [{ id: "c-1", code: "tt101" }], error: null }),
           }),
           update: () => ({
             eq: () => ({
@@ -286,9 +281,7 @@ describe("approveExtraction with Timetable auto-replay", () => {
           }),
           select: () => ({
             eq: () => ({
-              eq: () => ({
-                ilike: () => Promise.resolve({ data: [{ id: "c-1" }], error: null }),
-              }),
+              eq: () => Promise.resolve({ data: [{ id: "c-1", name: "時間割科目" }], error: null }),
             }),
           }),
         } as unknown as ReturnType<typeof supabase.from>
@@ -298,7 +291,9 @@ describe("approveExtraction with Timetable auto-replay", () => {
         return {
           delete: () => ({
             eq: () => Promise.resolve({ error: null }),
+            in: () => Promise.resolve({ error: null }),
           }),
+          insert: () => Promise.resolve({ error: null }),
         } as unknown as ReturnType<typeof supabase.from>
       }
 

@@ -149,6 +149,8 @@ def extract_advance_pdf_links(
                 text = anchor.get_text(strip=True)
                 if not href.lower().endswith(".pdf"):
                     continue
+                if "環境情報" in text or "環境情報" in href:
+                    continue
                 if href.startswith("//"):
                     href = "https:" + href
                 elif href.startswith("/"):

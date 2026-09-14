@@ -432,7 +432,7 @@ export function ReviewPage() {
             {isReviewable && (
               <Button
                 onClick={handleApprove}
-                disabled={!canSubmit || savingDraft}
+                disabled={!canSubmit || savingDraft || acting}
                 size="sm"
                 className="gap-1 text-xs sm:text-sm"
                 title={
@@ -442,7 +442,7 @@ export function ReviewPage() {
                 }
               >
                 <IconCheck className="size-4" />
-                <span>{acting ? "処理中…" : "承認"}</span>
+                <span>{acting ? "反映中（タブを閉じないでください）…" : "承認"}</span>
               </Button>
             )}
           </div>

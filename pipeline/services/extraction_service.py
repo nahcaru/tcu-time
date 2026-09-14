@@ -198,6 +198,7 @@ def run_pipeline_workflow(
     compute_hash: Callable[[bytes], str],
     get_pending_extractions: Callable[[], list[dict[str, Any]]],
     process_extraction: Callable[[dict[str, Any], list[int | None]], None],
+    notify_new_pdfs: Callable[[list[dict[str, Any]]], Any] | None = None,
 ) -> None:
     """Run the monitor-driven extraction workflow."""
     new_pdfs = check_for_updates()
@@ -205,6 +206,21 @@ def run_pipeline_workflow(
     academic_year_ref: list[int | None] = [None]
 
     if new_pdfs:
+        if notify_new_pdfs is not None:
+            try:
+                notify_new_pdfs(new_pdfs)
+            except Exception:
+                logger.warning("Failed to send notification for new PDFs", exc_info=True)
+        else:
+            try:
+                from pipeline.services.github_issue_service import (
+                    create_github_issue_for_new_pdfs,
+                )
+
+                create_github_issue_for_new_pdfs(new_pdfs)
+            except Exception:
+                logger.warning("Failed to create GitHub issue for new PDFs", exc_info=True)
+
         logger.info("Processing %d new/changed PDF(s)", len(new_pdfs))
         for pdf_info in new_pdfs:
             pdf_url: str = pdf_info["url"]
