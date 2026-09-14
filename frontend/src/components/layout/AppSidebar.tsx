@@ -53,14 +53,21 @@ export function AppSidebar() {
   const { user } = useAuth()
   const { resetAndStartTour } = useTutorial()
   const {
-    hasSyllabus,
+    spring,
+    fall,
     hasAdvance,
+    advanceUpdatedAt,
     hasChangelog,
-    timetableUpdatedAt,
-    syllabusUpdatedAt,
+    changelogUpdatedAt,
   } = useDataSources()
 
-  const formatDate = (isoString: string | null) => {
+  const formatShortDate = (isoString: string | null) => {
+    if (!isoString) return ""
+    const d = new Date(isoString)
+    return `(${d.getMonth() + 1}/${d.getDate()})`
+  }
+
+  const formatAcquiredDate = (isoString: string | null) => {
     if (!isoString) return ""
     const d = new Date(isoString)
     return `(${d.getMonth() + 1}/${d.getDate()}取得)`
@@ -177,41 +184,67 @@ export function AppSidebar() {
                     tooltip="データ取得元と取得日"
                     className="h-auto cursor-default py-2 hover:bg-transparent hover:text-sidebar-foreground"
                   >
-                    <IconDatabase className="text-muted-foreground" />
+                    <IconDatabase className="text-muted-foreground shrink-0" />
                     <div className="flex flex-col items-start gap-1">
                       <span className="text-xs font-semibold text-muted-foreground">
                         科目データ取得元
                       </span>
                       <div className="mt-1 flex w-full flex-col gap-1.5 text-[10px] leading-tight text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <span className="shrink-0 rounded px-1 text-[10px] font-medium">
-                            前期
-                          </span>
-                          <span>
-                            教学課 授業時間表{" "}
-                            <span className="ml-1">
-                              {formatDate(timetableUpdatedAt)}
-                            </span>
-                          </span>
-                        </div>
-                        {hasAdvance && (
-                          <p className="pl-7">- 先行履修 反映済み</p>
-                        )}
-                        {hasChangelog && (
-                          <p className="pl-7">- 変更一覧 反映済み</p>
+                        {spring && (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="shrink-0 rounded px-1 text-[10px] font-medium">
+                                前期
+                              </span>
+                              <span>
+                                教学課 授業時間表{spring.isTentative ? "(暫定)" : ""}{" "}
+                                <span className="ml-1">
+                                  {formatAcquiredDate(spring.updatedAt)}
+                                </span>
+                              </span>
+                            </div>
+                            {hasAdvance && (
+                              <p className="pl-7">
+                                - 先行履修 反映済み
+                                {advanceUpdatedAt && (
+                                  <span className="ml-1">
+                                    {formatShortDate(advanceUpdatedAt)}
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                            {hasChangelog && (
+                              <p className="pl-7">
+                                - 変更一覧 反映済み
+                                {changelogUpdatedAt && (
+                                  <span className="ml-1">
+                                    {formatShortDate(changelogUpdatedAt)}
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                          </div>
                         )}
 
-                        {hasSyllabus && (
+                        {fall && (
                           <div className="flex items-center gap-1.5">
                             <span className="shrink-0 rounded px-1 text-[10px] font-medium">
                               後期
                             </span>
                             <span>
-                              シラバス検索(暫定){" "}
+                              {fall.type === "syllabus"
+                                ? "シラバス検索(暫定)"
+                                : `教学課 授業時間表${fall.isTentative ? "(暫定)" : ""}`}{" "}
                               <span className="ml-1">
-                                {formatDate(syllabusUpdatedAt)}
+                                {formatAcquiredDate(fall.updatedAt)}
                               </span>
                             </span>
+                          </div>
+                        )}
+
+                        {!spring && !fall && (
+                          <div className="flex items-center gap-1.5">
+                            <span>データ未登録</span>
                           </div>
                         )}
 
