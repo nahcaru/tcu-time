@@ -188,7 +188,7 @@ export function getSavedReviewIndices(
 async function applyTimetableApproval(
   extractionId: string,
   raw: TimetableRawJson
-): Promise<number> {
+): Promise<{ count: number; replayedChangelogs: number }> {
   const { courses = [], academic_year, is_tentative = false, semester } = raw
 
   if (semester === "fall" && !is_tentative && academic_year) {
@@ -260,7 +260,53 @@ async function applyTimetableApproval(
     count++
   }
 
-  return count
+  // Auto-replay approved changelogs for this academic year & semester
+  // so timetable approvals (including 2nd edition or late approvals)
+  // automatically preserve all changelog diffs without regression.
+  let replayedChangelogs = 0
+  try {
+    const replayResult = await replayApprovedChangelogs(academic_year, semester)
+    replayedChangelogs = replayResult.extractionCount
+  } catch (err) {
+    console.warn("Failed to auto-replay approved changelogs:", err)
+  }
+
+  return { count, replayedChangelogs }
+}
+
+export async function replayApprovedChangelogs(
+  academicYear?: number | null,
+  semester?: string | null
+): Promise<{ extractionCount: number; changeCount: number }> {
+  const year = academicYear ?? new Date().getFullYear()
+
+  let query = supabase
+    .from("extractions")
+    .select("id, raw_json, created_at, semester")
+    .eq("pdf_type", "changelog")
+    .eq("status", "approved")
+    .eq("academic_year", year)
+
+  if (semester) {
+    query = query.or(`semester.eq.${semester},semester.is.null`)
+  }
+
+  const { data: changelogs, error: err } = await query.order("created_at", {
+    ascending: true,
+  })
+  if (err || !changelogs || changelogs.length === 0) {
+    return { extractionCount: 0, changeCount: 0 }
+  }
+
+  let totalChanges = 0
+  for (const ch of changelogs) {
+    const rawJson = ch.raw_json as unknown as ChangelogRawJson
+    if (rawJson && Array.isArray(rawJson.changes)) {
+      totalChanges += await applyChangelogApproval(ch.id, rawJson)
+    }
+  }
+
+  return { extractionCount: changelogs.length, changeCount: totalChanges }
 }
 
 // ---------------------------------------------------------------------------
@@ -475,7 +521,12 @@ export async function approveExtraction(
   extractionId: string,
   pdfType: string,
   editedRawJson: ExtractionRawJson
-): Promise<{ ok: boolean; count: number; error?: string }> {
+): Promise<{
+  ok: boolean
+  count: number
+  replayedChangelogs?: number
+  error?: string
+}> {
   try {
     const { error: saveErr } = await supabase
       .from("extractions")
@@ -488,11 +539,14 @@ export async function approveExtraction(
     if (saveErr) throw new Error(saveErr.message)
 
     let count = 0
+    let replayedChangelogs = 0
     if (pdfType === "timetable") {
-      count = await applyTimetableApproval(
+      const res = await applyTimetableApproval(
         extractionId,
         editedRawJson as TimetableRawJson
       )
+      count = res.count
+      replayedChangelogs = res.replayedChangelogs
     } else if (pdfType === "changelog") {
       count = await applyChangelogApproval(
         extractionId,
@@ -512,7 +566,7 @@ export async function approveExtraction(
 
     if (statusErr) throw new Error(statusErr.message)
 
-    return { ok: true, count }
+    return { ok: true, count, replayedChangelogs }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ok: false, count: 0, error: message }

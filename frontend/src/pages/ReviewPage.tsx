@@ -189,8 +189,12 @@ export function ReviewPage() {
     if (!result.ok) {
       showToast("承認に失敗しました: " + result.error, "error")
     } else {
+      const replayMsg =
+        result.replayedChangelogs && result.replayedChangelogs > 0
+          ? `（承認済み変更一覧 ${result.replayedChangelogs} 件を自動再適用）`
+          : ""
       showToast(
-        `${status === "approved" ? "再反映完了" : "承認完了"} — ${result.count} 件を反映しました`,
+        `${status === "approved" ? "再反映完了" : "承認完了"} — ${result.count} 件を反映しました${replayMsg}`,
         "success"
       )
       setTimeout(() => navigate("/admin"), 1200)

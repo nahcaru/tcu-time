@@ -56,7 +56,7 @@ export function CourseFieldsEditor({
           onChange={(v) => update({ room: v })}
         />
         <FormField
-          label="配当年次"
+          label="学年"
           value={c.year_level ?? 1}
           onChange={(v) => update({ year_level: Number(v) || 1 })}
         />
