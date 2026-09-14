@@ -67,7 +67,7 @@ def discover_available_flash_model(client: genai.Client | None = None) -> str:
             "Failed to query models list from Gemini API: %s", exc
         )
 
-    return "gemini-2.5-flash"
+    return Settings.GEMINI_MODEL or "gemini-flash-latest"
 
 
 def run_with_model_fallback(

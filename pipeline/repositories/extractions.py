@@ -84,3 +84,17 @@ def get_extraction_detail(extraction_id: str) -> Row | None:
     if not result.data:
         return None
     return cast(Row, result.data)
+
+
+def get_approved_changelogs(academic_year: int) -> list[Row]:
+    result = (
+        get_client()
+        .table("extractions")
+        .select("*")
+        .eq("status", "approved")
+        .eq("pdf_type", "changelog")
+        .eq("academic_year", academic_year)
+        .order("created_at")
+        .execute()
+    )
+    return cast(list[Row], result.data or [])

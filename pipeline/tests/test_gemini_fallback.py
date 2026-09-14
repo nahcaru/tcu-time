@@ -51,7 +51,7 @@ def test_fallback_model_used_on_primary_failure() -> None:
 def test_dynamic_discovery_used_on_both_failure() -> None:
     mock_client = MagicMock()
     model1 = MagicMock()
-    model1.name = "models/gemini-2.5-flash"
+    model1.name = "models/gemini-3.0-flash"
     mock_client.models.list.return_value = [model1]
 
     def runner_side_effect(m: str) -> str:
@@ -70,14 +70,14 @@ def test_dynamic_discovery_used_on_both_failure() -> None:
         client=mock_client,
     )
 
-    assert res == "discovered_success:gemini-2.5-flash"
+    assert res == "discovered_success:gemini-3.0-flash"
     assert runner.call_count == 3
 
 
 def test_discover_available_flash_model_prefers_latest_alias() -> None:
     mock_client = MagicMock()
     m1 = MagicMock()
-    m1.name = "models/gemini-2.5-flash"
+    m1.name = "models/gemini-3.0-flash"
     m2 = MagicMock()
     m2.name = "models/gemini-flash-latest"
     m3 = MagicMock()
