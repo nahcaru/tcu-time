@@ -188,7 +188,11 @@ export function getSavedReviewIndices(
 async function applyTimetableApproval(
   extractionId: string,
   raw: TimetableRawJson
-): Promise<{ count: number; replayedChangelogs: number }> {
+): Promise<{
+  count: number
+  replayedChangelogs: number
+  replayedAdvanceEnrollments: number
+}> {
   const { courses = [], academic_year, is_tentative = false, semester } = raw
 
   if (semester === "fall" && !is_tentative && academic_year) {
@@ -271,7 +275,46 @@ async function applyTimetableApproval(
     console.warn("Failed to auto-replay approved changelogs:", err)
   }
 
-  return { count, replayedChangelogs }
+  // Auto-replay approved advance enrollments for this academic year
+  // so approving advance enrollment before timetable still works,
+  // and so late or definitive timetable approvals preserve advance enrollment.
+  let replayedAdvanceEnrollments = 0
+  try {
+    const replayAdvanceResult = await replayApprovedAdvanceEnrollment(academic_year)
+    replayedAdvanceEnrollments = replayAdvanceResult.extractionCount
+  } catch (err) {
+    console.warn("Failed to auto-replay approved advance enrollment:", err)
+  }
+
+  return { count, replayedChangelogs, replayedAdvanceEnrollments }
+}
+
+export async function replayApprovedAdvanceEnrollment(
+  academicYear?: number | null
+): Promise<{ extractionCount: number; courseCount: number }> {
+  const year = academicYear ?? new Date().getFullYear()
+
+  const { data: advanceExtractions, error: err } = await supabase
+    .from("extractions")
+    .select("id, raw_json, created_at")
+    .eq("pdf_type", "advance_enrollment")
+    .eq("status", "approved")
+    .eq("academic_year", year)
+    .order("created_at", { ascending: true })
+
+  if (err || !advanceExtractions || advanceExtractions.length === 0) {
+    return { extractionCount: 0, courseCount: 0 }
+  }
+
+  let totalCourses = 0
+  for (const ext of advanceExtractions) {
+    const rawJson = ext.raw_json as unknown as AdvanceRawJson
+    if (rawJson && Array.isArray(rawJson.names)) {
+      totalCourses += await applyAdvanceApproval(ext.id, rawJson)
+    }
+  }
+
+  return { extractionCount: advanceExtractions.length, courseCount: totalCourses }
 }
 
 export async function replayApprovedChangelogs(
@@ -492,21 +535,20 @@ async function applyAdvanceApproval(
 
   let count = 0
   for (const name of names) {
-    const { data: found } = await supabase
+    const { data: matches } = await supabase
       .from("courses")
       .select("id")
       .eq("academic_year", year)
       .eq("status", "active")
       .ilike("name", name)
-      .limit(1)
-      .single()
 
-    if (found) {
+    if (matches && matches.length > 0) {
+      const ids = matches.map((m) => m.id)
       await supabase
         .from("courses")
         .update({ advance_enrollment: true })
-        .eq("id", found.id)
-      count++
+        .in("id", ids)
+      count += ids.length
     }
   }
 
@@ -525,6 +567,7 @@ export async function approveExtraction(
   ok: boolean
   count: number
   replayedChangelogs?: number
+  replayedAdvanceEnrollments?: number
   error?: string
 }> {
   try {
@@ -540,6 +583,7 @@ export async function approveExtraction(
 
     let count = 0
     let replayedChangelogs = 0
+    let replayedAdvanceEnrollments = 0
     if (pdfType === "timetable") {
       const res = await applyTimetableApproval(
         extractionId,
@@ -547,6 +591,7 @@ export async function approveExtraction(
       )
       count = res.count
       replayedChangelogs = res.replayedChangelogs
+      replayedAdvanceEnrollments = res.replayedAdvanceEnrollments
     } else if (pdfType === "changelog") {
       count = await applyChangelogApproval(
         extractionId,
@@ -566,7 +611,7 @@ export async function approveExtraction(
 
     if (statusErr) throw new Error(statusErr.message)
 
-    return { ok: true, count, replayedChangelogs }
+    return { ok: true, count, replayedChangelogs, replayedAdvanceEnrollments }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ok: false, count: 0, error: message }

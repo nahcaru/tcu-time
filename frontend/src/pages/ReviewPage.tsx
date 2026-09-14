@@ -189,9 +189,16 @@ export function ReviewPage() {
     if (!result.ok) {
       showToast("承認に失敗しました: " + result.error, "error")
     } else {
+      const messages: string[] = []
+      if (result.replayedChangelogs && result.replayedChangelogs > 0) {
+        messages.push(`変更一覧 ${result.replayedChangelogs} 件`)
+      }
+      if (result.replayedAdvanceEnrollments && result.replayedAdvanceEnrollments > 0) {
+        messages.push(`先行履修 ${result.replayedAdvanceEnrollments} 件`)
+      }
       const replayMsg =
-        result.replayedChangelogs && result.replayedChangelogs > 0
-          ? `（承認済み変更一覧 ${result.replayedChangelogs} 件を自動再適用）`
+        messages.length > 0
+          ? `（承認済み ${messages.join("・")}を自動再適用）`
           : ""
       showToast(
         `${status === "approved" ? "再反映完了" : "承認完了"} — ${result.count} 件を反映しました${replayMsg}`,
