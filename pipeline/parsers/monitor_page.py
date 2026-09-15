@@ -84,6 +84,8 @@ def extract_pdf_links(
             text = anchor.get_text(strip=True)
             if not href.lower().endswith(".pdf"):
                 continue
+            if "環境情報" in text or "環境情報" in href:
+                continue
 
             if href.startswith("//"):
                 href = "https:" + href
@@ -98,7 +100,6 @@ def extract_pdf_links(
                 label = f"〈{department}〉{current_subheading}{text}"
             else:
                 label = f"〈{department}〉{text}"
-
             links.append(PdfLink(url=href, label=label))
 
     logger.info(
@@ -165,9 +166,9 @@ def extract_advance_pdf_links(
             text = anchor.get_text(strip=True)
             if not href.lower().endswith(".pdf"):
                 continue
-            if h4_tags and department not in text:
+            if "環境情報" in text or "環境情報" in href:
                 continue
-            if "環境情報" in text and department not in text:
+            if h4_tags and department not in text:
                 continue
             if href.startswith("//"):
                 href = "https:" + href

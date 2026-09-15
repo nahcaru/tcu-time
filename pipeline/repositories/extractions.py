@@ -15,6 +15,9 @@ def create_extraction(
     academic_year: int | None = None,
     status: str = "pending",
 ) -> Row:
+    if "環境情報" in pdf_url:
+        return {}
+
     payload: dict[str, Any] = {
         "pdf_url": pdf_url,
         "pdf_hash": pdf_hash,

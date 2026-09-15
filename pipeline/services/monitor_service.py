@@ -38,6 +38,10 @@ def check_for_updates(
     queued: list[dict[str, str]] = []
 
     for link in current_links:
+        if "環境情報" in link.label or "環境情報" in link.url:
+            logger.info("Skipping excluded department (環境情報): %s (%s)", link.label, link.url)
+            continue
+
         pdf_bytes = download_pdf(link.url)
         pdf_hash = compute_hash(pdf_bytes)
 
