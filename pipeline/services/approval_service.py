@@ -38,7 +38,49 @@ def _apply_timetable_approval(extraction: Row) -> int:
         is_tentative=is_tentative,
         semester=semester,
     )
+    _replay_approved_changelogs(academic_year=academic_year)
+    _replay_approved_advance_enrollments(academic_year=academic_year)
     return len(upserted)
+
+
+def _replay_approved_changelogs(academic_year: int | None) -> int:
+    if academic_year is None:
+        academic_year = current_academic_year()
+    try:
+        approved_changelogs = extractions.get_approved_changelogs(academic_year)
+        count = 0
+        for ch in approved_changelogs:
+            count += _apply_changelog_approval(ch)
+        if approved_changelogs:
+            logger.info(
+                "Auto-replayed %d approved changelog extraction(s) for academic_year=%d",
+                len(approved_changelogs),
+                academic_year,
+            )
+        return count
+    except Exception as exc:
+        logger.warning("Failed to auto-replay approved changelogs: %s", exc)
+        return 0
+
+
+def _replay_approved_advance_enrollments(academic_year: int | None) -> int:
+    if academic_year is None:
+        academic_year = current_academic_year()
+    try:
+        approved_advance = extractions.get_approved_advance_enrollments(academic_year)
+        count = 0
+        for adv in approved_advance:
+            count += _apply_advance_approval(adv)
+        if approved_advance:
+            logger.info(
+                "Auto-replayed %d approved advance enrollment extraction(s) for academic_year=%d",
+                len(approved_advance),
+                academic_year,
+            )
+        return count
+    except Exception as exc:
+        logger.warning("Failed to auto-replay approved advance enrollments: %s", exc)
+        return 0
 
 
 def _apply_changelog_approval(extraction: Row) -> int:

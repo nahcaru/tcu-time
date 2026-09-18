@@ -97,39 +97,6 @@ class FieldChange(BaseModel):
         return str(v)
 
 
-class ChangeEntry(BaseModel):
-    """A single entry from a changelog PDF."""
-
-    change_type: ChangeType
-    course_code: str | None = None
-    course_name: str
-    term: str | None = None
-    day: str | None = None
-    period: int | str | None = None
-    changes: list[FieldChange] = []
-
-    @field_validator("period", mode="before")
-    @classmethod
-    def coerce_period(cls, v: object) -> int | str | None:
-        """Gemini may return period as int, numeric string, or text like '集中'."""
-        if v is None:
-            return None
-        if isinstance(v, int):
-            return v
-        s = str(v).strip()
-        if not s:
-            return None
-        try:
-            return int(s)
-        except ValueError:
-            return s
-
-
-# ---------------------------------------------------------------------------
-# Course data models (Gemini extraction output)
-# ---------------------------------------------------------------------------
-
-
 class Schedule(BaseModel):
     day: str
     period: int
@@ -153,6 +120,50 @@ class CourseTarget(BaseModel):
     target_code: str
     target_name: str
     note: str = ""
+
+
+class ChangeEntry(BaseModel):
+    """A single entry from a changelog PDF."""
+
+    change_type: ChangeType
+    course_code: str | None = None
+    course_name: str
+    term: str | None = None
+    day: str | None = None
+    period: int | str | None = None
+    schedules: list[Schedule] = []
+    instructors: list[str] = []
+    room: str | None = None
+    targets: list[CourseTarget] = []
+    changes: list[FieldChange] = []
+
+    @field_validator("change_type", mode="before")
+    @classmethod
+    def normalize_change_type(cls, v: object) -> str:
+        s = str(v).lower().strip()
+        if s in ("modify", "update", "更新"):
+            return "update"
+        if s in ("cancel", "delete", "削除"):
+            return "delete"
+        if s in ("add", "create", "新規"):
+            return "create"
+        return s
+
+    @field_validator("period", mode="before")
+    @classmethod
+    def coerce_period(cls, v: object) -> int | str | None:
+        """Gemini may return period as int, numeric string, or text like '集中'."""
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return v
+        s = str(v).strip()
+        if not s:
+            return None
+        try:
+            return int(s)
+        except ValueError:
+            return s
 
 
 class ExtractedCourse(BaseModel):

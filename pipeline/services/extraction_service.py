@@ -25,22 +25,53 @@ def handle_timetable(
         update_extraction_status(extraction_id, "extracted", raw_json={"courses": [], "count": 0})
         return 0
 
+    fall_count = sum(1 for c in courses if getattr(c, "semester", None) == Semester.FALL)
+    spring_count = sum(1 for c in courses if getattr(c, "semester", None) == Semester.SPRING)
+    detected_semester = semester_str
+    if not detected_semester:
+        if fall_count > spring_count:
+            detected_semester = Semester.FALL.value
+        elif spring_count > fall_count:
+            detected_semester = Semester.SPRING.value
+    elif detected_semester == Semester.SPRING.value and fall_count > 0 and spring_count == 0:
+        detected_semester = Semester.FALL.value
+    elif detected_semester == Semester.FALL.value and spring_count > 0 and fall_count == 0:
+        detected_semester = Semester.SPRING.value
+
+    from pipeline.core.validator import validate_extracted_courses
+
     courses_data = [c.model_dump() for c in courses]
+    validation_warnings = validate_extracted_courses(courses, semester=detected_semester)
+    if validation_warnings:
+        logger.warning(
+            "Validation warnings detected for %s: %d issues found",
+            pdf_url,
+            len(validation_warnings),
+        )
+
+    update_kwargs: dict[str, Any] = {
+        "raw_json": {
+            "courses": courses_data,
+            "count": len(courses),
+            "semester": detected_semester,
+            "is_tentative": is_tentative,
+            "academic_year": academic_year,
+            "validation_warnings": validation_warnings,
+        },
+    }
+    if detected_semester:
+        update_kwargs["semester"] = detected_semester
+
     update_extraction_status(
         extraction_id,
         "extracted",
-        raw_json={
-            "courses": courses_data,
-            "count": len(courses),
-            "semester": semester_str,
-            "is_tentative": is_tentative,
-            "academic_year": academic_year,
-        },
+        **update_kwargs,
     )
     logger.info(
-        "Timetable extracted: %d courses from %s — awaiting admin approval",
+        "Timetable extracted: %d courses from %s (semester=%s) — awaiting admin approval",
         len(courses),
         pdf_url,
+        detected_semester,
     )
     return len(courses)
 
@@ -178,6 +209,7 @@ def run_pipeline_workflow(
     compute_hash: Callable[[bytes], str],
     get_pending_extractions: Callable[[], list[dict[str, Any]]],
     process_extraction: Callable[[dict[str, Any], list[int | None]], None],
+    notify_new_pdfs: Callable[[list[dict[str, Any]]], Any] | None = None,
 ) -> None:
     """Run the monitor-driven extraction workflow."""
     new_pdfs = check_for_updates()
@@ -185,6 +217,21 @@ def run_pipeline_workflow(
     academic_year_ref: list[int | None] = [None]
 
     if new_pdfs:
+        if notify_new_pdfs is not None:
+            try:
+                notify_new_pdfs(new_pdfs)
+            except Exception:
+                logger.warning("Failed to send notification for new PDFs", exc_info=True)
+        else:
+            try:
+                from pipeline.services.github_issue_service import (
+                    create_github_issue_for_new_pdfs,
+                )
+
+                create_github_issue_for_new_pdfs(new_pdfs)
+            except Exception:
+                logger.warning("Failed to create GitHub issue for new PDFs", exc_info=True)
+
         logger.info("Processing %d new/changed PDF(s)", len(new_pdfs))
         for pdf_info in new_pdfs:
             pdf_url: str = pdf_info["url"]

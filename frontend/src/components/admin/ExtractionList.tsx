@@ -3,31 +3,43 @@ import { useNavigate } from "react-router"
 import { supabase } from "@/lib/supabase"
 import type { Extraction } from "@/lib/database.types"
 import { ExtractionTableSkeleton } from "@/components/admin/AdminSkeleton"
+import { StatusBadge } from "@/components/admin/StatusBadge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Card } from "@/components/ui/card"
+import { IconFileText, IconChevronRight } from "@tabler/icons-react"
 
 type StatusFilter = "all" | "extracted" | "approved" | "pending"
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending:   { label: "処理中",   color: "bg-yellow-100 text-yellow-800" },
-  extracted: { label: "承認待ち", color: "bg-blue-100 text-blue-800" },
-  approved:  { label: "承認済み", color: "bg-green-100 text-green-800" },
-}
-
 const PDF_TYPE_LABELS: Record<string, string> = {
-  timetable:          "時間割",
-  changelog:          "変更一覧",
+  timetable: "授業時間表",
+  changelog: "変更一覧",
   advance_enrollment: "先行履修",
 }
 
 const SEMESTER_LABELS: Record<string, string> = {
   spring: "前期",
-  fall:   "後期",
+  fall: "後期",
 }
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—"
   return new Date(iso).toLocaleString("ja-JP", {
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   })
 }
 
@@ -36,6 +48,7 @@ export function ExtractionList() {
   const [extractions, setExtractions] = useState<Extraction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<StatusFilter>("extracted")
+  const [latestYearOnly, setLatestYearOnly] = useState(true)
   const [latestOnly, setLatestOnly] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,17 +56,12 @@ export function ExtractionList() {
     const fetchData = async () => {
       setLoading(true)
       setError(null)
-      const query = supabase
+      const { data, error: err } = await supabase
         .from("extractions")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100)
 
-      if (filter !== "all") {
-        query.eq("status", filter)
-      }
-
-      const { data, error: err } = await query
       if (err) {
         setError("データの取得に失敗しました: " + err.message)
       } else {
@@ -63,68 +71,92 @@ export function ExtractionList() {
     }
 
     fetchData()
-  }, [filter])
+  }, [])
 
-  // Solely list the latest of each document type when latestOnly is true
+  // Identify latest academic year present across ALL extractions regardless of current tab
+  const maxYear = useMemo(() => {
+    return extractions.reduce((max, ext) => {
+      if (ext.academic_year && ext.academic_year > max) return ext.academic_year
+      return max
+    }, 0)
+  }, [extractions])
+
+  // Filter by status tab
+  const statusFilteredExtractions = useMemo(() => {
+    if (filter === "all") return extractions
+    return extractions.filter((ext) => (ext.status ?? "pending") === filter)
+  }, [extractions, filter])
+
+  // Filter by latest year and/or latest of each document identity
   const displayedExtractions = useMemo(() => {
-    if (!latestOnly) return extractions
+    let list = statusFilteredExtractions
+
+    if (latestYearOnly && maxYear > 0) {
+      list = list.filter((ext) => ext.academic_year === maxYear)
+    }
+
+    if (!latestOnly) return list
 
     const seen = new Set<string>()
-    return extractions.filter((ext) => {
-      // Group by document identity: (pdf_type, semester)
-      const docKey = `${ext.pdf_type ?? "unknown"}_${ext.semester ?? "all"}`
+    return list.filter((ext) => {
+      // Group by document identity: (academic_year, pdf_type, semester)
+      const docKey = `${ext.academic_year ?? "any"}_${ext.pdf_type ?? "unknown"}_${ext.semester ?? "all"}`
       if (seen.has(docKey)) return false
       seen.add(docKey)
       return true
     })
-  }, [extractions, latestOnly])
-
-  const filters: { value: StatusFilter; label: string }[] = [
-    { value: "all",       label: "すべて" },
-    { value: "extracted", label: "承認待ち" },
-    { value: "approved",  label: "承認済み" },
-    { value: "pending",   label: "処理中" },
-  ]
+  }, [statusFilteredExtractions, latestYearOnly, maxYear, latestOnly])
 
   return (
     <div className="space-y-4">
-      {/* Filter tabs and Latest Only Toggle */}
+      {/* Filter tabs and Latest Only / Latest Year Toggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-2 flex-wrap">
-          {filters.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                filter === f.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/70"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          value={filter}
+          onValueChange={(v) => setFilter(v as StatusFilter)}
+          className="w-auto"
+        >
+          <TabsList>
+            <TabsTrigger value="extracted">承認待ち</TabsTrigger>
+            <TabsTrigger value="all">すべて</TabsTrigger>
+            <TabsTrigger value="approved">承認済み</TabsTrigger>
+            <TabsTrigger value="pending">処理中</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {/* Latest Only Toggle */}
-        <div className="flex items-center gap-2">
-          <button
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Latest Year Only Toggle */}
+          <Button
             type="button"
-            onClick={() => setLatestOnly((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-              latestOnly
-                ? "bg-secondary text-secondary-foreground border-border shadow-xs"
-                : "bg-background text-muted-foreground border-border/80 hover:bg-muted/50"
-            }`}
+            variant={latestYearOnly ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setLatestYearOnly((prev) => !prev)}
+            className="w-fit gap-2 text-xs font-medium"
           >
-            <span className={latestOnly ? "text-primary" : "text-muted-foreground"}>
-              {latestOnly ? "✓" : "○"}
+            <Checkbox
+              checked={latestYearOnly}
+              className="pointer-events-none size-3.5"
+            />
+            <span>最新年度のみ{maxYear ? ` (${maxYear}年度)` : ""}</span>
+          </Button>
+
+          {/* Latest Only Toggle */}
+          <Button
+            type="button"
+            variant={latestOnly ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setLatestOnly((prev) => !prev)}
+            className="w-fit gap-2 text-xs font-medium"
+          >
+            <Checkbox
+              checked={latestOnly}
+              className="pointer-events-none size-3.5"
+            />
+            <span>最新版のみ</span>
+            <span className="text-[11px] text-muted-foreground">
+              ({displayedExtractions.length} / {statusFilteredExtractions.length}件)
             </span>
-            <span>各書類の最新版のみ表示</span>
-            <span className="text-[10px] text-muted-foreground ml-0.5">
-              ({displayedExtractions.length} / {extractions.length}件)
-            </span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -133,79 +165,112 @@ export function ExtractionList() {
 
       {/* Error state */}
       {error && !loading && (
-        <div className="text-center py-12 text-destructive">{error}</div>
+        <Card className="py-12 text-center text-destructive shadow-xs">
+          {error}
+        </Card>
       )}
 
       {/* Empty state */}
       {!loading && !error && displayedExtractions.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
+        <Card className="py-12 text-center text-muted-foreground shadow-xs">
           該当する抽出タスクがありません
-        </div>
+        </Card>
       )}
 
       {/* Table */}
       {!loading && !error && displayedExtractions.length > 0 && (
-        <div className="rounded-xl border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">種別</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">学期</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">年度</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">PDF URL</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">ステータス</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">更新日時</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+        <Card className="gap-0 overflow-hidden rounded-xl border py-0 shadow-xs">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow>
+                <TableHead className="font-semibold text-muted-foreground">
+                  種別
+                </TableHead>
+                <TableHead className="font-semibold text-muted-foreground">
+                  学期
+                </TableHead>
+                <TableHead className="font-semibold text-muted-foreground">
+                  年度
+                </TableHead>
+                <TableHead className="font-semibold text-muted-foreground">
+                  ステータス
+                </TableHead>
+                <TableHead className="font-semibold text-muted-foreground">
+                  更新日時
+                </TableHead>
+                <TableHead className="text-right font-semibold text-muted-foreground">
+                  操作
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {displayedExtractions.map((ext) => {
                 const status = ext.status ?? "pending"
-                const badge = STATUS_LABELS[status] ?? { label: status, color: "bg-muted text-muted-foreground" }
+
                 return (
-                  <tr
+                  <TableRow
                     key={ext.id}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    className="cursor-pointer transition-colors hover:bg-muted/40"
                     onClick={() => navigate(`/admin/review/${ext.id}`)}
                   >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span>{PDF_TYPE_LABELS[ext.pdf_type ?? ""] ?? ext.pdf_type ?? "—"}</span>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <IconFileText className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="font-medium">
+                          {PDF_TYPE_LABELS[ext.pdf_type ?? ""] ??
+                            ext.pdf_type ??
+                            "—"}
+                        </span>
                         {latestOnly && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-muted text-muted-foreground font-mono">
+                          <Badge
+                            variant="secondary"
+                            className="h-4 px-1.5 py-0 text-[10px] font-normal"
+                          >
                             最新
-                          </span>
+                          </Badge>
                         )}
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {SEMESTER_LABELS[ext.semester ?? ""] ?? ext.semester ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">{ext.academic_year ?? "—"}</td>
-                    <td className="px-4 py-3 max-w-xs truncate" title={ext.pdf_url}>
-                      {ext.pdf_url.split("/").slice(-2).join("/")}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
-                        {badge.label}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">
+                        {SEMESTER_LABELS[ext.semester ?? ""] ??
+                          ext.semester ??
+                          "—"}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">
+                        {ext.academic_year ? `${ext.academic_year}年度` : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={ext.status} />
+                    </TableCell>
+                    <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                       {formatDate(ext.updated_at ?? ext.created_at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {status === "extracted" && (
-                        <span className="text-primary text-xs font-medium">
-                          レビュー →
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-primary hover:bg-primary/5 hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/admin/review/${ext.id}`)
+                        }}
+                      >
+                        <span>
+                          {status === "extracted" ? "レビュー" : "詳細"}
                         </span>
-                      )}
-                    </td>
-                  </tr>
+                        <IconChevronRight className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </div>
   )

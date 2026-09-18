@@ -238,12 +238,13 @@ class TestExtractPdfLinks:
             assert link.label.startswith("〈総合理工学研究科〉")
 
     def test_label_content(self) -> None:
-        """Should preserve the original link text after the department prefix."""
+        """Should preserve the original link text after the department prefix with subheading context."""
         links = extract_pdf_links(REALISTIC_HTML)
         labels = [link.label for link in links]
 
         assert "〈総合理工学研究科〉【前期】授業時間表変更一覧" in labels
-        assert "〈総合理工学研究科〉授業時間表" in labels
+        assert "〈総合理工学研究科〉【前期】授業時間表" in labels
+        assert "〈総合理工学研究科〉【後期】授業時間表" in labels
 
     def test_preserves_order(self) -> None:
         """Should preserve the order of links as they appear in HTML."""
@@ -526,6 +527,25 @@ class TestExtractAdvancePdfLinks:
 
         assert "https://example.com/grad_front.pdf" not in urls
         assert "https://example.com/grad_changes.pdf" not in urls
+
+    def test_filters_by_department_and_ignores_other_departments(self) -> None:
+        """Should only extract PDF links for target department (総合理工学研究科) and exclude other departments (環境情報学研究科)."""
+        html = """\
+        <div id="main">
+        <section>
+          <div class="header"><h3>【先行履修】</h3></div>
+          <h4>総合理工学研究科〈全専攻〉</h4>
+          <p><a href="https://example.com/souri_advance.pdf">総合理工学研究科　先行履修についての案内</a></p>
+          <hr/>
+          <h4>環境情報学研究科〈都市生活学専攻〉</h4>
+          <p><a href="https://example.com/kankyou_advance.pdf">環境情報学研究科　博士前期課程授業科目の先行履修について</a></p>
+        </section>
+        </div>
+        """
+        links = extract_advance_pdf_links(html, department="総合理工学研究科")
+        assert len(links) == 1
+        assert links[0].url == "https://example.com/souri_advance.pdf"
+        assert "総合理工学研究科" in links[0].label
 
     def test_custom_section_header(self) -> None:
         """Should support custom section header."""
@@ -1003,3 +1023,26 @@ class TestClassifyPdfLink:
         result = classify_pdf_link("授業時間表")
         assert result.pdf_type == PDFType.TIMETABLE
         assert result.semester is None
+
+    def test_url_fallback_fall_semester(self) -> None:
+        """September upload URL should resolve to Fall semester if not in text."""
+        result = classify_pdf_link(
+            "授業時間表",
+            url="https://www.asc.tcu.ac.jp/wp-content/uploads/2026/09/fb6e01051e507fba8682b137a39a7151.pdf",
+        )
+        assert result.pdf_type == PDFType.TIMETABLE
+        assert result.semester == Semester.FALL
+
+    def test_url_fallback_spring_semester(self) -> None:
+        """March upload URL should resolve to Spring semester if not in text."""
+        result = classify_pdf_link(
+            "授業時間表",
+            url="https://www.asc.tcu.ac.jp/wp-content/uploads/2026/03/45f62652853be3c046219378c75c02e4.pdf",
+        )
+        assert result.pdf_type == PDFType.TIMETABLE
+        assert result.semester == Semester.SPRING
+
+    def test_is_tentative_keyword(self) -> None:
+        """Tentative indicator in label sets is_tentative."""
+        result = classify_pdf_link("授業時間表（予定）")
+        assert result.is_tentative is True

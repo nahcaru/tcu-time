@@ -38,6 +38,10 @@ def check_for_updates(
     queued: list[dict[str, str]] = []
 
     for link in current_links:
+        if "環境情報" in link.label or "環境情報" in link.url:
+            logger.info("Skipping excluded department (環境情報): %s (%s)", link.label, link.url)
+            continue
+
         pdf_bytes = download_pdf(link.url)
         pdf_hash = compute_hash(pdf_bytes)
 
@@ -49,7 +53,7 @@ def check_for_updates(
             continue
 
         action = "new" if is_new else "changed"
-        metadata: PDFMetadata = classify_pdf_link(link.label)
+        metadata: PDFMetadata = classify_pdf_link(link.label, url=link.url)
         logger.info(
             "[%s] %s — %s (type=%s, semester=%s)",
             action.upper(),
@@ -70,7 +74,7 @@ def check_for_updates(
             link.url,
             pdf_hash,
             pdf_type=metadata.pdf_type.value,
-            semester=metadata.semester.value if metadata.semester else "spring",
+            semester=metadata.semester.value if metadata.semester else None,
             is_tentative=metadata.is_tentative,
             academic_year=academic_year,
         )

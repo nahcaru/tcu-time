@@ -20,6 +20,9 @@ def upsert_pdf_link(
     pdf_type: str | None = None,
     semester: str | None = None,
 ) -> Row:
+    if "環境情報" in url or (label and "環境情報" in label):
+        return {}
+
     row: dict[str, Any] = {
         "url": url,
         "hash": pdf_hash,

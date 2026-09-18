@@ -66,12 +66,25 @@ def extract_pdf_links(
 
     seen: set[str] = set()
     links: list[PdfLink] = []
+    current_subheading = ""
+
     for sibling in iter_siblings_until(target_h4, {"h4", "hr"}):
+        if sibling.name in {"h5", "h6"} or "■" in sibling.get_text():
+            sub_text = sibling.get_text(strip=True)
+            if "前期" in sub_text and "後期" not in sub_text:
+                current_subheading = "【前期】"
+            elif "後期" in sub_text and "前期" not in sub_text:
+                current_subheading = "【後期】"
+            elif "通年" in sub_text:
+                current_subheading = "【通年】"
+
         anchors = sibling.find_all("a", href=True) if sibling.name != "a" else [sibling]
         for anchor in anchors:
             href = str(anchor["href"])
             text = anchor.get_text(strip=True)
             if not href.lower().endswith(".pdf"):
+                continue
+            if "環境情報" in text or "環境情報" in href:
                 continue
 
             if href.startswith("//"):
@@ -83,7 +96,11 @@ def extract_pdf_links(
                 continue
             seen.add(href)
 
-            links.append(PdfLink(url=href, label=f"〈{department}〉{text}"))
+            if current_subheading and "前期" not in text and "後期" not in text:
+                label = f"〈{department}〉{current_subheading}{text}"
+            else:
+                label = f"〈{department}〉{text}"
+            links.append(PdfLink(url=href, label=label))
 
     logger.info(
         "Found %d PDF link(s) for '%s' in '%s' section",
@@ -98,6 +115,7 @@ def extract_advance_pdf_links(
     html: str,
     *,
     section_header: str = ADVANCE_SECTION_HEADER,
+    department: str = GRAD_DEPARTMENT,
 ) -> list[PdfLink]:
     soup = BeautifulSoup(html, "html.parser")
     root = soup.find("div", id="main") or soup
@@ -113,27 +131,64 @@ def extract_advance_pdf_links(
         logger.debug("No <section> containing <h3> with '%s' found", section_header)
         return []
 
+    # Look for department heading (e.g. <h4>総合理工学研究科〈全専攻〉</h4>)
+    target_h4: Tag | None = None
+    h4_tags = advance_section.find_all("h4")
+    for h4 in h4_tags:
+        if department in h4.get_text():
+            target_h4 = h4
+            break
+
     seen: set[str] = set()
     links: list[PdfLink] = []
-    for anchor in advance_section.find_all("a", href=True):
-        href = str(anchor["href"])
-        text = anchor.get_text(strip=True)
-        if not href.lower().endswith(".pdf"):
-            continue
-        if href.startswith("//"):
-            href = "https:" + href
-        elif href.startswith("/"):
-            href = f"https://www.asc.tcu.ac.jp{href}"
-        if href in seen:
-            continue
-        seen.add(href)
-        links.append(PdfLink(url=href, label=text))
 
-    logger.info("Found %d advance-enrollment PDF link(s) in '%s' section", len(links), section_header)
+    if target_h4 is not None:
+        for sibling in iter_siblings_until(target_h4, {"h4", "hr"}):
+            anchors = sibling.find_all("a", href=True) if sibling.name != "a" else [sibling]
+            for anchor in anchors:
+                href = str(anchor["href"])
+                text = anchor.get_text(strip=True)
+                if not href.lower().endswith(".pdf"):
+                    continue
+                if "環境情報" in text or "環境情報" in href:
+                    continue
+                if href.startswith("//"):
+                    href = "https:" + href
+                elif href.startswith("/"):
+                    href = f"https://www.asc.tcu.ac.jp{href}"
+                if href in seen:
+                    continue
+                seen.add(href)
+                links.append(PdfLink(url=href, label=text))
+    else:
+        for anchor in advance_section.find_all("a", href=True):
+            href = str(anchor["href"])
+            text = anchor.get_text(strip=True)
+            if not href.lower().endswith(".pdf"):
+                continue
+            if "環境情報" in text or "環境情報" in href:
+                continue
+            if h4_tags and department not in text:
+                continue
+            if href.startswith("//"):
+                href = "https:" + href
+            elif href.startswith("/"):
+                href = f"https://www.asc.tcu.ac.jp{href}"
+            if href in seen:
+                continue
+            seen.add(href)
+            links.append(PdfLink(url=href, label=text))
+
+    logger.info(
+        "Found %d advance-enrollment PDF link(s) for '%s' in '%s' section",
+        len(links),
+        department,
+        section_header,
+    )
     return links
 
 
-def classify_pdf_link(link_text: str) -> PDFMetadata:
+def classify_pdf_link(link_text: str, url: str | None = None) -> PDFMetadata:
     text = link_text.strip()
 
     if "変更一覧" in text or "変更" in text:
@@ -151,10 +206,24 @@ def classify_pdf_link(link_text: str) -> PDFMetadata:
         semester = Semester.SPRING
     elif "後期" in text and "前期" not in text:
         semester = Semester.FALL
+    elif url:
+        match = re.search(r"/20\d{2}/(\d{2})/", url)
+        if match:
+            month = int(match.group(1))
+            if month in {8, 9, 10, 11, 12, 1}:
+                semester = Semester.FALL
+            elif month in {2, 3, 4, 5, 6, 7}:
+                semester = Semester.SPRING
+            else:
+                semester = None
+        else:
+            semester = None
     else:
         semester = None
 
-    return PDFMetadata(pdf_type=pdf_type, semester=semester, is_tentative=False)
+    is_tentative = "予定" in text or "（予定）" in text or "仮" in text
+
+    return PDFMetadata(pdf_type=pdf_type, semester=semester, is_tentative=is_tentative)
 
 
 def extract_academic_year(soup: BeautifulSoup) -> int:

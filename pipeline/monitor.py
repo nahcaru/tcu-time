@@ -104,8 +104,11 @@ def extract_advance_pdf_links(
     html: str,
     *,
     section_header: str = ADVANCE_SECTION_HEADER,
+    department: str = GRAD_DEPARTMENT,
 ) -> list[PdfLink]:
-    return _extract_advance_pdf_links(html, section_header=section_header)
+    return _extract_advance_pdf_links(
+        html, section_header=section_header, department=department
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -123,8 +126,8 @@ def compute_hash(data: bytes) -> str:
 # ---------------------------------------------------------------------------
 
 
-def classify_pdf_link(link_text: str) -> PDFMetadata:
-    return _classify_pdf_link(link_text)
+def classify_pdf_link(link_text: str, url: str | None = None) -> PDFMetadata:
+    return _classify_pdf_link(link_text, url=url)
 
 
 # ---------------------------------------------------------------------------

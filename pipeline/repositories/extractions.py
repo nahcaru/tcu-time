@@ -10,11 +10,14 @@ def create_extraction(
     pdf_hash: str,
     *,
     pdf_type: str = "timetable",
-    semester: str = "spring",
+    semester: str | None = None,
     is_tentative: bool = False,
     academic_year: int | None = None,
     status: str = "pending",
 ) -> Row:
+    if "環境情報" in pdf_url:
+        return {}
+
     payload: dict[str, Any] = {
         "pdf_url": pdf_url,
         "pdf_hash": pdf_hash,
@@ -35,12 +38,15 @@ def update_extraction_status(
     *,
     raw_json: dict[str, Any] | None = None,
     error_log: str | None = None,
+    semester: str | None = None,
 ) -> Row:
     payload: dict[str, Any] = {"status": status, "updated_at": now_iso()}
     if raw_json is not None:
         payload["raw_json"] = raw_json
     if error_log is not None:
         payload["error_log"] = error_log
+    if semester is not None:
+        payload["semester"] = semester
     result = (
         get_client().table("extractions").update(payload).eq("id", extraction_id).execute()
     )
@@ -81,3 +87,31 @@ def get_extraction_detail(extraction_id: str) -> Row | None:
     if not result.data:
         return None
     return cast(Row, result.data)
+
+
+def get_approved_changelogs(academic_year: int) -> list[Row]:
+    result = (
+        get_client()
+        .table("extractions")
+        .select("*")
+        .eq("status", "approved")
+        .eq("pdf_type", "changelog")
+        .eq("academic_year", academic_year)
+        .order("created_at")
+        .execute()
+    )
+    return cast(list[Row], result.data or [])
+
+
+def get_approved_advance_enrollments(academic_year: int) -> list[Row]:
+    result = (
+        get_client()
+        .table("extractions")
+        .select("*")
+        .eq("status", "approved")
+        .eq("pdf_type", "advance_enrollment")
+        .eq("academic_year", academic_year)
+        .order("created_at")
+        .execute()
+    )
+    return cast(list[Row], result.data or [])
