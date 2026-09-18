@@ -38,7 +38,17 @@ def handle_timetable(
     elif detected_semester == Semester.FALL.value and spring_count > 0 and fall_count == 0:
         detected_semester = Semester.SPRING.value
 
+    from pipeline.core.validator import validate_extracted_courses
+
     courses_data = [c.model_dump() for c in courses]
+    validation_warnings = validate_extracted_courses(courses, semester=detected_semester)
+    if validation_warnings:
+        logger.warning(
+            "Validation warnings detected for %s: %d issues found",
+            pdf_url,
+            len(validation_warnings),
+        )
+
     update_kwargs: dict[str, Any] = {
         "raw_json": {
             "courses": courses_data,
@@ -46,6 +56,7 @@ def handle_timetable(
             "semester": detected_semester,
             "is_tentative": is_tentative,
             "academic_year": academic_year,
+            "validation_warnings": validation_warnings,
         },
     }
     if detected_semester:

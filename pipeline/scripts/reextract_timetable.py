@@ -75,6 +75,10 @@ def reextract_timetable(extraction_id: str = "8711ac3c-c91a-4bbe-8db8-2fa9213da8
     logger.info("Updated status: %s", updated_res.data.get("status"))
     logger.info("Updated courses count: %d", len(courses))
     logger.info("Term distribution after re-extraction: %s", term_counts)
+    warnings = updated_raw.get("validation_warnings", [])
+    logger.info("Validation warnings count: %d", len(warnings))
+    for w in warnings[:5]:
+        logger.warning("  [%s] %s: %s (%s)", w.get("severity"), w.get("code"), w.get("message"), w.get("name"))
 
 
 if __name__ == "__main__":

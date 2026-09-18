@@ -142,12 +142,21 @@ export interface BaseRawJson {
   checked_indices?: number[]
 }
 
+export interface ValidationWarning {
+  code: string
+  name: string
+  field: string
+  message: string
+  severity: "error" | "warning" | "info"
+}
+
 export interface TimetableRawJson extends BaseRawJson {
   courses: RawCourse[]
   semester?: string
   is_tentative?: boolean
   academic_year?: number
   count?: number
+  validation_warnings?: ValidationWarning[]
 }
 
 export interface ChangelogRawJson extends BaseRawJson {
@@ -218,7 +227,10 @@ async function applyTimetableApproval(
     extraction_id: extractionId,
     status: "active",
     source_type: "timetable",
-    term: inferTerm(course, semester),
+    term:
+      course.term && (VALID_TERMS as readonly string[]).includes(course.term)
+        ? (course.term as ValidTerm)
+        : inferTerm(course, semester),
     room: course.room,
   }))
 

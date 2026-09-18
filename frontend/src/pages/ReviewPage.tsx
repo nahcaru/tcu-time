@@ -7,6 +7,7 @@ import {
   saveReviewDraft,
   getSavedReviewIndices,
   inferTerm,
+  VALID_TERMS,
   type TimetableRawJson,
   type ChangelogRawJson,
   type AdvanceRawJson,
@@ -176,7 +177,10 @@ export function ReviewPage() {
       const timetableData = editedJson as TimetableRawJson
       const normalizedCourses = (timetableData.courses ?? []).map((c) => ({
         ...c,
-        term: inferTerm(c, extraction.semester || timetableData.semester),
+        term:
+          c.term && (VALID_TERMS as readonly string[]).includes(c.term)
+            ? c.term
+            : inferTerm(c, extraction.semester || timetableData.semester),
       }))
       finalJson = {
         ...timetableData,

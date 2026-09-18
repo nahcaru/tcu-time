@@ -2,7 +2,9 @@ import {
   inferTerm,
   VALID_TERMS,
   type RawCourse,
+  type ValidationWarning,
 } from "@/lib/approvalService"
+import { IconAlertTriangle } from "@tabler/icons-react"
 import { FormField, FormSelect } from "./FormControls"
 import { ScheduleEditor } from "./ScheduleEditor"
 import { InstructorsEditor } from "./InstructorsEditor"
@@ -13,6 +15,7 @@ interface CourseFieldsEditorProps {
   onChange: (course: RawCourse) => void
   extractionSemester?: string | null
   className?: string
+  warnings?: ValidationWarning[]
 }
 
 export function CourseFieldsEditor({
@@ -20,6 +23,7 @@ export function CourseFieldsEditor({
   onChange,
   extractionSemester,
   className,
+  warnings = [],
 }: CourseFieldsEditorProps) {
   const displayTerm = inferTerm(c, extractionSemester)
 
@@ -29,6 +33,22 @@ export function CourseFieldsEditor({
 
   return (
     <div className={className ?? "space-y-4"}>
+      {warnings.length > 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+          <div className="flex items-center gap-1.5 font-medium">
+            <IconAlertTriangle className="size-4 shrink-0 text-amber-600" />
+            <span>自動抽出時の検知項目 ({warnings.length}件):</span>
+          </div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {warnings.map((w, idx) => (
+              <li key={idx}>
+                <span className="font-medium">{w.field}:</span> {w.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Basic fields */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField

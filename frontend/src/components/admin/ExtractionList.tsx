@@ -56,17 +56,12 @@ export function ExtractionList() {
     const fetchData = async () => {
       setLoading(true)
       setError(null)
-      const query = supabase
+      const { data, error: err } = await supabase
         .from("extractions")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100)
 
-      if (filter !== "all") {
-        query.eq("status", filter)
-      }
-
-      const { data, error: err } = await query
       if (err) {
         setError("データの取得に失敗しました: " + err.message)
       } else {
@@ -76,9 +71,9 @@ export function ExtractionList() {
     }
 
     fetchData()
-  }, [filter])
+  }, [])
 
-  // Identify latest academic year present in extractions
+  // Identify latest academic year present across ALL extractions regardless of current tab
   const maxYear = useMemo(() => {
     return extractions.reduce((max, ext) => {
       if (ext.academic_year && ext.academic_year > max) return ext.academic_year
@@ -86,9 +81,15 @@ export function ExtractionList() {
     }, 0)
   }, [extractions])
 
+  // Filter by status tab
+  const statusFilteredExtractions = useMemo(() => {
+    if (filter === "all") return extractions
+    return extractions.filter((ext) => (ext.status ?? "pending") === filter)
+  }, [extractions, filter])
+
   // Filter by latest year and/or latest of each document identity
   const displayedExtractions = useMemo(() => {
-    let list = extractions
+    let list = statusFilteredExtractions
 
     if (latestYearOnly && maxYear > 0) {
       list = list.filter((ext) => ext.academic_year === maxYear)
@@ -104,7 +105,7 @@ export function ExtractionList() {
       seen.add(docKey)
       return true
     })
-  }, [extractions, latestYearOnly, maxYear, latestOnly])
+  }, [statusFilteredExtractions, latestYearOnly, maxYear, latestOnly])
 
   return (
     <div className="space-y-4">
@@ -153,7 +154,7 @@ export function ExtractionList() {
             />
             <span>最新版のみ</span>
             <span className="text-[11px] text-muted-foreground">
-              ({displayedExtractions.length} / {extractions.length}件)
+              ({displayedExtractions.length} / {statusFilteredExtractions.length}件)
             </span>
           </Button>
         </div>
