@@ -18,11 +18,15 @@ def handle_timetable(
     academic_year: int,
     extract_courses_from_pdf: Callable[[bytes], list[Any]],
     update_extraction_status: Callable[..., Any],
+    published_at: str | None = None,
 ) -> int:
     courses = extract_courses_from_pdf(pdf_bytes)
     if not courses:
         logger.warning("No courses extracted from %s", pdf_url)
-        update_extraction_status(extraction_id, "extracted", raw_json={"courses": [], "count": 0})
+        empty_raw_json: dict[str, Any] = {"courses": [], "count": 0}
+        if published_at:
+            empty_raw_json["published_at"] = published_at
+        update_extraction_status(extraction_id, "extracted", raw_json=empty_raw_json)
         return 0
 
     fall_count = sum(1 for c in courses if getattr(c, "semester", None) == Semester.FALL)
@@ -49,15 +53,19 @@ def handle_timetable(
             len(validation_warnings),
         )
 
+    raw_json_payload: dict[str, Any] = {
+        "courses": courses_data,
+        "count": len(courses),
+        "semester": detected_semester,
+        "is_tentative": is_tentative,
+        "academic_year": academic_year,
+        "validation_warnings": validation_warnings,
+    }
+    if published_at:
+        raw_json_payload["published_at"] = published_at
+
     update_kwargs: dict[str, Any] = {
-        "raw_json": {
-            "courses": courses_data,
-            "count": len(courses),
-            "semester": detected_semester,
-            "is_tentative": is_tentative,
-            "academic_year": academic_year,
-            "validation_warnings": validation_warnings,
-        },
+        "raw_json": raw_json_payload,
     }
     if detected_semester:
         update_kwargs["semester"] = detected_semester
@@ -85,22 +93,30 @@ def handle_changelog(
     academic_year: int,
     parse_changelog: Callable[[bytes], list[Any]],
     update_extraction_status: Callable[..., Any],
+    published_at: str | None = None,
 ) -> None:
     changes = parse_changelog(pdf_bytes)
     if not changes:
         logger.info("No changelog entries found in %s", pdf_url)
-        update_extraction_status(extraction_id, "extracted", raw_json={"changes": [], "count": 0})
+        empty_raw_json: dict[str, Any] = {"changes": [], "count": 0}
+        if published_at:
+            empty_raw_json["published_at"] = published_at
+        update_extraction_status(extraction_id, "extracted", raw_json=empty_raw_json)
         return
+
+    raw_json_payload: dict[str, Any] = {
+        "changes": [c.model_dump() for c in changes],
+        "count": len(changes),
+        "semester": semester_str or Semester.SPRING.value,
+        "academic_year": academic_year,
+    }
+    if published_at:
+        raw_json_payload["published_at"] = published_at
 
     update_extraction_status(
         extraction_id,
         "extracted",
-        raw_json={
-            "changes": [c.model_dump() for c in changes],
-            "count": len(changes),
-            "semester": semester_str or Semester.SPRING.value,
-            "academic_year": academic_year,
-        },
+        raw_json=raw_json_payload,
     )
     logger.info(
         "Changelog extracted: %d entries from %s — awaiting admin approval",
@@ -117,17 +133,29 @@ def handle_advance_enrollment(
     academic_year: int,
     extract_course_names: Callable[[bytes], list[str]],
     update_extraction_status: Callable[..., Any],
+    published_at: str | None = None,
 ) -> None:
     course_names = extract_course_names(pdf_bytes)
     if not course_names:
         logger.info("No course names extracted from advance enrollment PDF %s", pdf_url)
-        update_extraction_status(extraction_id, "extracted", raw_json={"names": [], "count": 0})
+        empty_raw_json: dict[str, Any] = {"names": [], "count": 0}
+        if published_at:
+            empty_raw_json["published_at"] = published_at
+        update_extraction_status(extraction_id, "extracted", raw_json=empty_raw_json)
         return
+
+    raw_json_payload: dict[str, Any] = {
+        "names": course_names,
+        "count": len(course_names),
+        "academic_year": academic_year,
+    }
+    if published_at:
+        raw_json_payload["published_at"] = published_at
 
     update_extraction_status(
         extraction_id,
         "extracted",
-        raw_json={"names": course_names, "count": len(course_names), "academic_year": academic_year},
+        raw_json=raw_json_payload,
     )
     logger.info(
         "Advance enrollment extracted: %d names from %s — awaiting admin approval",
@@ -165,6 +193,14 @@ def process_extraction(
     if academic_year_ref[0] is None:
         academic_year_ref[0] = year
 
+    raw_json_data = extraction.get("raw_json")
+    published_at = raw_json_data.get("published_at") if isinstance(raw_json_data, dict) else None
+    if not published_at:
+        from pipeline.services.monitor_service import extract_published_at
+
+        last_modified = getattr(pdf_bytes, "last_modified", None)
+        published_at = extract_published_at(pdf_bytes, last_modified)
+
     try:
         if pdf_type_str == PDFType.TIMETABLE.value:
             handle_timetable(
@@ -174,6 +210,7 @@ def process_extraction(
                 semester_str=semester_str,
                 is_tentative=False,
                 academic_year=year,
+                published_at=published_at,
             )
         elif pdf_type_str == PDFType.CHANGELOG.value:
             handle_changelog(
@@ -182,6 +219,7 @@ def process_extraction(
                 extraction_id=extraction_id,
                 semester_str=semester_str,
                 academic_year=year,
+                published_at=published_at,
             )
         elif pdf_type_str == PDFType.ADVANCE_ENROLLMENT.value:
             handle_advance_enrollment(
@@ -189,6 +227,7 @@ def process_extraction(
                 pdf_url=pdf_url,
                 extraction_id=extraction_id,
                 academic_year=year,
+                published_at=published_at,
             )
         else:
             logger.warning("Unknown pdf_type '%s' for %s — skipping", pdf_type_str, pdf_url)

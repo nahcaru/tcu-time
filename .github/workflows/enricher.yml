@@ -1,8 +1,8 @@
 name: Course Metadata Enricher
 
 on:
-  schedule:
-    - cron: "30 21 * * *" # 06:30 JST (UTC+9)
+  repository_dispatch:
+    types: [enrich-courses]
   workflow_dispatch:
 
 concurrency:
@@ -26,6 +26,8 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: Install dependencies
         run: uv sync --frozen

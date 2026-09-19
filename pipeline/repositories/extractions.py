@@ -14,6 +14,7 @@ def create_extraction(
     is_tentative: bool = False,
     academic_year: int | None = None,
     status: str = "pending",
+    published_at: str | None = None,
 ) -> Row:
     if "環境情報" in pdf_url:
         return {}
@@ -28,6 +29,8 @@ def create_extraction(
     }
     if academic_year is not None:
         payload["academic_year"] = academic_year
+    if published_at is not None:
+        payload["raw_json"] = {"published_at": published_at}
     result = get_client().table("extractions").insert(payload).execute()
     return first_row(result.data)
 

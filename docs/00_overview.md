@@ -49,6 +49,7 @@ TCU-TIME は、東京都市大学の大学院生（総合理工学研究科）�
 | [02_data_model.md](./02_data_model.md) | データモデル設計（DB スキーマ・課題データ構造） |
 | [03_frontend.md](./03_frontend.md) | フロントエンド設計（画面構成・コンポーネント） |
 | [04_infrastructure.md](./04_infrastructure.md) | インフラ設計（ホスティング・CI/CD・環境構成） |
+| [05_github_actions.md](./05_github_actions.md) | GitHub Actions 設計（CI・日次監視・オンデマンド実行・運用） |
 
 ## レガシー版との比較
 

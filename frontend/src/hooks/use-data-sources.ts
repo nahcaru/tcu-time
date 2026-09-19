@@ -5,6 +5,10 @@ export interface SemesterSource {
   type: "timetable" | "syllabus"
   isTentative: boolean
   updatedAt: string | null
+  hasChangelog?: boolean
+  changelogUpdatedAt?: string | null
+  hasAdvance?: boolean
+  advanceUpdatedAt?: string | null
 }
 
 export interface DataSourceStatus {
@@ -14,6 +18,7 @@ export interface DataSourceStatus {
   changelogUpdatedAt: string | null
   hasAdvance: boolean
   advanceUpdatedAt: string | null
+  targetYear: number | null
   isLoading: boolean
 
   // Backward compatibility fields
@@ -31,6 +36,7 @@ export function useDataSources(): DataSourceStatus {
     changelogUpdatedAt: null,
     hasAdvance: false,
     advanceUpdatedAt: null,
+    targetYear: null,
     isLoading: true,
     hasTimetable: true,
     timetableUpdatedAt: null,
@@ -71,7 +77,7 @@ export function useDataSources(): DataSourceStatus {
       const { data: extractionsData } = await supabase
         .from("extractions")
         .select(
-          "id, pdf_type, semester, is_tentative, academic_year, status, created_at, updated_at"
+          "id, pdf_type, semester, is_tentative, academic_year, status, created_at, updated_at, raw_json"
         )
         .eq("academic_year", targetYear)
         .eq("status", "approved")
@@ -90,7 +96,7 @@ export function useDataSources(): DataSourceStatus {
       const courses: CourseSummary[] = coursesData ?? []
       const extractions: ExtractionSummary[] = extractionsData ?? []
 
-      const resolved = resolveDataSources(extractions, courses)
+      const resolved = resolveDataSources(extractions, courses, targetYear)
 
       setSources({
         ...resolved,
@@ -124,8 +130,10 @@ export interface ExtractionSummary {
   is_tentative?: boolean | null
   academic_year?: number | null
   status?: string | null
+  published_at?: string | null
   created_at?: string | null
   updated_at?: string | null
+  raw_json?: unknown
 }
 
 function isSpringCourse(c: CourseSummary): boolean {
@@ -142,31 +150,74 @@ function isFallCourse(c: CourseSummary): boolean {
 
 export function resolveDataSources(
   extractions: ExtractionSummary[],
-  courses: CourseSummary[]
+  courses: CourseSummary[],
+  targetYear: number | null = null
 ): Omit<DataSourceStatus, "isLoading"> {
+  const getMaxDate = (dates: (string | null | undefined)[]) =>
+    dates.reduce<string | null>((max, d) => {
+      if (!d) return max
+      if (!max || d > max) return d
+      return max
+    }, null)
+
+  const getExtDate = (ext?: ExtractionSummary) => {
+    if (!ext) return null
+    if (ext.published_at) return ext.published_at
+    if (
+      ext.raw_json &&
+      typeof ext.raw_json === "object" &&
+      "published_at" in ext.raw_json
+    ) {
+      const pub = (ext.raw_json as { published_at?: unknown }).published_at
+      if (typeof pub === "string") return pub
+    }
+    return ext.created_at ?? ext.updated_at ?? null
+  }
+
   // --- Changelogs ---
   const approvedChangelogs = extractions.filter(
     (e) => e.pdf_type === "changelog" && (e.status === "approved" || !e.status)
   )
+  const changelogCourses = courses.filter((c) => c.source_type === "changelog")
   const hasChangelog =
     approvedChangelogs.length > 0 ||
-    courses.some((c) => c.source_type === "changelog")
+    changelogCourses.length > 0
   const changelogUpdatedAt =
-    approvedChangelogs[0]?.updated_at ??
-    approvedChangelogs[0]?.created_at ??
-    null
+    getExtDate(approvedChangelogs[0]) ??
+    getMaxDate(changelogCourses.map((c) => c.updated_at))
 
-  // --- Advance Enrollment ---
+  // --- Advance Enrollment (Common across semesters) ---
   const approvedAdvance = extractions.filter(
-    (e) => e.pdf_type === "advance_enrollment" && (e.status === "approved" || !e.status)
+    (e) =>
+      e.pdf_type === "advance_enrollment" &&
+      (e.status === "approved" || !e.status)
   )
+  const advanceCourses = courses.filter((c) => c.advance_enrollment === true)
   const hasAdvance =
     approvedAdvance.length > 0 ||
-    courses.some((c) => c.advance_enrollment === true)
+    advanceCourses.length > 0
   const advanceUpdatedAt =
-    approvedAdvance[0]?.updated_at ??
-    approvedAdvance[0]?.created_at ??
-    null
+    getExtDate(approvedAdvance[0]) ??
+    getMaxDate(advanceCourses.map((c) => c.updated_at))
+
+  // --- Per-Semester Changelogs ---
+  const springChangelogs = approvedChangelogs.filter(
+    (e) => e.semester === "spring"
+  )
+  const springChangelogCourses = changelogCourses.filter(isSpringCourse)
+  const springHasChangelog =
+    springChangelogs.length > 0 || springChangelogCourses.length > 0
+  const springChangelogUpdatedAt =
+    getExtDate(springChangelogs[0]) ??
+    getMaxDate(springChangelogCourses.map((c) => c.updated_at))
+
+  const fallChangelogs = approvedChangelogs.filter((e) => e.semester === "fall")
+  const fallChangelogCourses = changelogCourses.filter(isFallCourse)
+  const fallHasChangelog =
+    fallChangelogs.length > 0 || fallChangelogCourses.length > 0
+  const fallChangelogUpdatedAt =
+    getExtDate(fallChangelogs[0]) ??
+    getMaxDate(fallChangelogCourses.map((c) => c.updated_at))
 
   // --- Spring Source ---
   const springTimetableExt = extractions.find(
@@ -183,19 +234,13 @@ export function resolveDataSources(
     const isTentative =
       springTimetableExt?.is_tentative ??
       springCourses.some((c) => c.is_tentative)
-    const maxSpringUpdate = springCourses.reduce<string | null>((max, c) => {
-      if (!c.updated_at) return max
-      if (!max || c.updated_at > max) return c.updated_at
-      return max
-    }, null)
+    const maxSpringUpdate = getMaxDate(springCourses.map((c) => c.updated_at))
     springSource = {
       type: "timetable",
       isTentative: Boolean(isTentative),
-      updatedAt:
-        springTimetableExt?.updated_at ??
-        springTimetableExt?.created_at ??
-        maxSpringUpdate ??
-        null,
+      updatedAt: getExtDate(springTimetableExt) ?? maxSpringUpdate,
+      hasChangelog: springHasChangelog,
+      changelogUpdatedAt: springChangelogUpdatedAt,
     }
   }
 
@@ -219,30 +264,22 @@ export function resolveDataSources(
     const isTentative =
       fallTimetableExt?.is_tentative ??
       fallTimetableCourses.some((c) => c.is_tentative)
-    const maxFallUpdate = fallTimetableCourses.reduce<string | null>((max, c) => {
-      if (!c.updated_at) return max
-      if (!max || c.updated_at > max) return c.updated_at
-      return max
-    }, null)
+    const maxFallUpdate = getMaxDate(fallTimetableCourses.map((c) => c.updated_at))
     fallSource = {
       type: "timetable",
       isTentative: Boolean(isTentative),
-      updatedAt:
-        fallTimetableExt?.updated_at ??
-        fallTimetableExt?.created_at ??
-        maxFallUpdate ??
-        null,
+      updatedAt: getExtDate(fallTimetableExt) ?? maxFallUpdate,
+      hasChangelog: fallHasChangelog,
+      changelogUpdatedAt: fallChangelogUpdatedAt,
     }
   } else if (fallSyllabusCourses.length > 0) {
-    const maxSyllabusUpdate = fallSyllabusCourses.reduce<string | null>((max, c) => {
-      if (!c.updated_at) return max
-      if (!max || c.updated_at > max) return c.updated_at
-      return max
-    }, null)
+    const maxSyllabusUpdate = getMaxDate(fallSyllabusCourses.map((c) => c.updated_at))
     fallSource = {
       type: "syllabus",
       isTentative: true,
-      updatedAt: maxSyllabusUpdate ?? null,
+      updatedAt: maxSyllabusUpdate,
+      hasChangelog: fallHasChangelog,
+      changelogUpdatedAt: fallChangelogUpdatedAt,
     }
   }
 
@@ -260,6 +297,7 @@ export function resolveDataSources(
     changelogUpdatedAt,
     hasAdvance,
     advanceUpdatedAt,
+    targetYear,
     hasTimetable,
     timetableUpdatedAt,
     hasSyllabus,

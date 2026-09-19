@@ -57,20 +57,13 @@ export function AppSidebar() {
     fall,
     hasAdvance,
     advanceUpdatedAt,
-    hasChangelog,
-    changelogUpdatedAt,
+    targetYear,
   } = useDataSources()
 
   const formatShortDate = (isoString: string | null) => {
     if (!isoString) return ""
     const d = new Date(isoString)
     return `(${d.getMonth() + 1}/${d.getDate()})`
-  }
-
-  const formatAcquiredDate = (isoString: string | null) => {
-    if (!isoString) return ""
-    const d = new Date(isoString)
-    return `(${d.getMonth() + 1}/${d.getDate()}取得)`
   }
 
   // マッピング: pathname → tutorial page key
@@ -187,7 +180,7 @@ export function AppSidebar() {
                     <IconDatabase className="text-muted-foreground shrink-0" />
                     <div className="flex flex-col items-start gap-1">
                       <span className="text-xs font-semibold text-muted-foreground">
-                        科目データ取得元
+                        科目データ取得元{targetYear ? ` (${targetYear}年度)` : ""}
                       </span>
                       <div className="mt-1 flex w-full flex-col gap-1.5 text-[10px] leading-tight text-muted-foreground">
                         {spring && (
@@ -199,26 +192,16 @@ export function AppSidebar() {
                               <span>
                                 教学課 授業時間表{spring.isTentative ? "(暫定)" : ""}{" "}
                                 <span className="ml-1">
-                                  {formatAcquiredDate(spring.updatedAt)}
+                                  {formatShortDate(spring.updatedAt)}
                                 </span>
                               </span>
                             </div>
-                            {hasAdvance && (
-                              <p className="pl-7">
-                                - 先行履修 反映済み
-                                {advanceUpdatedAt && (
-                                  <span className="ml-1">
-                                    {formatShortDate(advanceUpdatedAt)}
-                                  </span>
-                                )}
-                              </p>
-                            )}
-                            {hasChangelog && (
+                            {spring.hasChangelog && (
                               <p className="pl-7">
                                 - 変更一覧 反映済み
-                                {changelogUpdatedAt && (
+                                {spring.changelogUpdatedAt && (
                                   <span className="ml-1">
-                                    {formatShortDate(changelogUpdatedAt)}
+                                    {formatShortDate(spring.changelogUpdatedAt)}
                                   </span>
                                 )}
                               </p>
@@ -227,17 +210,42 @@ export function AppSidebar() {
                         )}
 
                         {fall && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="shrink-0 rounded px-1 text-[10px] font-medium">
-                              後期
-                            </span>
-                            <span>
-                              {fall.type === "syllabus"
-                                ? "シラバス検索(暫定)"
-                                : `教学課 授業時間表${fall.isTentative ? "(暫定)" : ""}`}{" "}
-                              <span className="ml-1">
-                                {formatAcquiredDate(fall.updatedAt)}
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="shrink-0 rounded px-1 text-[10px] font-medium">
+                                後期
                               </span>
+                              <span>
+                                {fall.type === "syllabus"
+                                  ? "シラバス検索(暫定)"
+                                  : `教学課 授業時間表${fall.isTentative ? "(暫定)" : ""}`}{" "}
+                                <span className="ml-1">
+                                  {formatShortDate(fall.updatedAt)}
+                                </span>
+                              </span>
+                            </div>
+                            {fall.hasChangelog && (
+                              <p className="pl-7">
+                                - 変更一覧 反映済み
+                                {fall.changelogUpdatedAt && (
+                                  <span className="ml-1">
+                                    {formatShortDate(fall.changelogUpdatedAt)}
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {hasAdvance && (
+                          <div className="flex items-center gap-1.5">
+                            <span>
+                              先行履修科目一覧
+                              {advanceUpdatedAt && (
+                                <span className="ml-1">
+                                  {formatShortDate(advanceUpdatedAt)}
+                                </span>
+                              )}
                             </span>
                           </div>
                         )}
