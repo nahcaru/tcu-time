@@ -61,7 +61,7 @@ flowchart TD
   1. **`backend` (Python)**:
      - OS: `ubuntu-latest`
      - ツール: `astral-sh/setup-uv@v7`（`enable-cache: true`）
-     - 依存解決: `uv sync --frozen`
+     - 依存解決: `uv sync --frozen --extra dev`
      - テスト実行: `uv run pytest tests/ -v`（全 196 件以上の単体テスト・モックテスト）
   2. **`frontend` (TypeScript / React)**:
      - OS: `ubuntu-latest`
