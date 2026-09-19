@@ -5,6 +5,7 @@
  * - Selected target/department
  * - Earned credits per category
  */
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
   useContext,

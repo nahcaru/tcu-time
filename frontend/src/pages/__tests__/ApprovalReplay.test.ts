@@ -136,7 +136,7 @@ describe("replayApprovedAdvanceEnrollment", () => {
     let queriedStatus = ""
     let queriedYear = 0
     let resetDone = false
-    let updatedIds: string[] = []
+    const updatedIds: string[] = []
 
     const mockFrom = spyOn(supabase, "from").mockImplementation((table: string) => {
       if (table === "extractions") {
