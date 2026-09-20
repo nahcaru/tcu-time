@@ -126,3 +126,34 @@ def test_validate_missing_classroom():
     room_warnings = [w for w in warnings if w["field"] == "room"]
     assert len(room_warnings) == 1
     assert room_warnings[0]["severity"] == "info"
+
+
+def test_validate_fullwidth_character_warnings():
+    courses = [
+        ExtractedCourse(
+            code="smaa010031",
+            name="ＰＰＰ／ＰＦＩ特論（基礎）",
+            instructors=["山田\u3000太郎"],
+            term="前期前",
+            room="講義室（1号館）",
+            semester=Semester.SPRING,
+            schedules=[Schedule(day="月", period=1)],
+        )
+    ]
+    warnings = validate_extracted_courses(courses)
+    # Check instructor warning
+    inst_warnings = [w for w in warnings if w["field"] == "instructors" and "全角スペース" in w["message"]]
+    assert len(inst_warnings) == 1
+
+    # Check fullwidth alpha warning in name
+    alpha_warnings = [w for w in warnings if w["field"] == "name" and "全角英数字" in w["message"]]
+    assert len(alpha_warnings) == 1
+
+    # Check fullwidth symbol warning in name
+    sym_warnings = [w for w in warnings if w["field"] == "name" and "全角記号" in w["message"]]
+    assert len(sym_warnings) == 1
+
+    # Check fullwidth symbol warning in room
+    room_sym_warnings = [w for w in warnings if w["field"] == "room" and "全角記号" in w["message"]]
+    assert len(room_sym_warnings) == 1
+

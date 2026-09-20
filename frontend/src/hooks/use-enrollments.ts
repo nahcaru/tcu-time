@@ -68,7 +68,9 @@ function getEnrollmentCache(userId: string | null | undefined) {
   if (existing) return existing
 
   const created: EnrollmentsCacheEntry = {
-    data: userId ? readStoredEnrollments(getAuthStorageKey(userId)) : readLocalEnrollments(),
+    data: userId
+      ? readStoredEnrollments(getAuthStorageKey(userId))
+      : readLocalEnrollments(),
     hasLoaded: !userId,
     isLoading: false,
     error: null,

@@ -49,8 +49,9 @@ export function AdvanceEditor({
             key={i}
             onClick={() => onSelectIndex?.(i)}
             className={cn(
-              "flex flex-row items-center gap-3 p-2 shadow-xs transition-all sm:px-3 cursor-pointer",
-              isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+              "flex cursor-pointer flex-row items-center gap-3 p-2 shadow-xs transition-all sm:px-3",
+              isActive &&
+                "ring-2 ring-primary ring-offset-2 ring-offset-background",
               isChecked
                 ? "border-border/60 bg-card/60"
                 : "border-border bg-card ring-1 ring-primary/20"

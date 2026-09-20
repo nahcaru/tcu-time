@@ -34,12 +34,12 @@ export function CourseFieldsEditor({
   return (
     <div className={className ?? "space-y-4"}>
       {warnings.length > 0 && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+        <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
           <div className="flex items-center gap-1.5 font-medium">
             <IconAlertTriangle className="size-4 shrink-0 text-amber-600" />
             <span>自動抽出時の検知項目 ({warnings.length}件):</span>
           </div>
-          <ul className="list-disc pl-5 space-y-0.5">
+          <ul className="list-disc space-y-0.5 pl-5">
             {warnings.map((w, idx) => (
               <li key={idx}>
                 <span className="font-medium">{w.field}:</span> {w.message}

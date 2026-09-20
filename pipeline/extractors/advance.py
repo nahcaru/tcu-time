@@ -13,6 +13,7 @@ from pipeline.adapters.gemini import (
     generate_pdf_json,
     run_with_model_fallback,
 )
+from pipeline.core.normalize import normalize_course_name
 from pipeline.core.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -130,25 +131,30 @@ def extract_course_names(pdf_bytes: bytes) -> list[str]:
     Attempts table-based extraction via pdfplumber first.
     If no table entries are found, falls back to Gemini.
     """
+    names: list[str] = []
     try:
-        names = extract_course_names_from_pdf_tables(pdf_bytes)
-        if names:
+        table_names = extract_course_names_from_pdf_tables(pdf_bytes)
+        if table_names:
             logger.info(
                 "Successfully extracted %d advance enrollment courses via pdfplumber",
-                len(names),
+                len(table_names),
             )
-            return names
-        logger.info(
-            "No course names found via pdfplumber tables; falling back to Gemini model"
-        )
+            names = table_names
+        else:
+            logger.info(
+                "No course names found via pdfplumber tables; falling back to Gemini model"
+            )
     except Exception as exc:
         logger.info(
             "pdfplumber extraction failed (%s); falling back to Gemini model", exc
         )
 
-    return run_with_model_fallback(
-        primary_model=Settings.GEMINI_MODEL,
-        fallback_model=Settings.GEMINI_FALLBACK_MODEL,
-        runner=lambda model: _request_course_names(model, pdf_bytes),
-        logger=logger,
-    )
+    if not names:
+        names = run_with_model_fallback(
+            primary_model=Settings.GEMINI_MODEL,
+            fallback_model=Settings.GEMINI_FALLBACK_MODEL,
+            runner=lambda model: _request_course_names(model, pdf_bytes),
+            logger=logger,
+        )
+
+    return [normalize_course_name(n) for n in names if normalize_course_name(n)]

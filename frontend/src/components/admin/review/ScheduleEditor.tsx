@@ -43,10 +43,7 @@ export function ScheduleEditor({
   return (
     <div className={cn("space-y-2", className)}>
       {!hideHeader && (
-        <FormSectionHeader
-          title={label}
-          count={schedules.length}
-        />
+        <FormSectionHeader title={label} count={schedules.length} />
       )}
       {schedules.length > 0 && (
         <div className="space-y-1.5">

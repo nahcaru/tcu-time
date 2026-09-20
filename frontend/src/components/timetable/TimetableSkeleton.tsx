@@ -6,18 +6,18 @@ function GridSkeleton({ title }: { title: string }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm">{title}</h3>
+        <h3 className="text-sm font-semibold">{title}</h3>
         <Skeleton className="h-4 w-12" />
       </div>
       <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th className="w-8 border-b border-r p-1 text-center text-xs font-normal text-muted-foreground" />
+              <th className="w-8 border-r border-b p-1 text-center text-xs font-normal text-muted-foreground" />
               {DAYS.map((day) => (
                 <th
                   key={day}
-                  className="border-b border-r p-1 text-center text-xs font-medium text-muted-foreground last:border-r-0"
+                  className="border-r border-b p-1 text-center text-xs font-medium text-muted-foreground last:border-r-0"
                 >
                   {day}
                 </th>
@@ -27,13 +27,13 @@ function GridSkeleton({ title }: { title: string }) {
           <tbody>
             {PERIODS.map((period) => (
               <tr key={period}>
-                <td className="border-b border-r p-1 text-center text-xs text-muted-foreground">
+                <td className="border-r border-b p-1 text-center text-xs text-muted-foreground">
                   {period}
                 </td>
                 {DAYS.map((day) => (
                   <td
                     key={day}
-                    className="h-14 border-b border-r p-1 last:border-r-0 sm:h-16"
+                    className="h-14 border-r border-b p-1 last:border-r-0 sm:h-16"
                   >
                     <Skeleton className="h-full w-full rounded opacity-40" />
                   </td>
@@ -70,7 +70,7 @@ function CreditsSkeleton() {
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-5/6" />
         <Skeleton className="h-4 w-4/6" />
-        <Skeleton className="h-6 w-full mt-2" />
+        <Skeleton className="mt-2 h-6 w-full" />
       </div>
     </div>
   )

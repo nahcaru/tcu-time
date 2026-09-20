@@ -10,6 +10,7 @@ import { FilterPanel, FilterContent } from "@/components/course/FilterPanel"
 import { CourseCard } from "@/components/course/CourseCard"
 import { useCourses } from "@/hooks/use-courses"
 import { IconLoader2 } from "@tabler/icons-react"
+import { normalizeCourseName, normalizeInstructorName } from "@/lib/normalize"
 
 interface AddCourseDialogProps {
   open: boolean
@@ -62,8 +63,8 @@ export function AddCourseDialog({
   // Filter by the specific slot
   const slotCourses = useMemo(() => {
     if (day === "集中") {
-      return courses.filter((c) =>
-        c.term != null && (c.term.includes("集中") || c.term === "通年")
+      return courses.filter(
+        (c) => c.term != null && (c.term.includes("集中") || c.term === "通年")
       )
     }
     if (!day || !period) return []
@@ -75,8 +76,12 @@ export function AddCourseDialog({
   const suggestions = useMemo(() => {
     const items = new Set<string>()
     suggestionBase.forEach((c) => {
-      items.add(c.name)
-      c.instructors.forEach((i) => items.add(i))
+      const nName = normalizeCourseName(c.name)
+      if (nName) items.add(nName)
+      c.instructors.forEach((i) => {
+        const nInst = normalizeInstructorName(i)
+        if (nInst) items.add(nInst)
+      })
     })
     return Array.from(items)
   }, [suggestionBase])

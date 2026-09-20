@@ -15,6 +15,14 @@ from pydantic import BaseModel, Field
 
 from pipeline.adapters.gemini import run_with_model_fallback
 from pipeline.config import Config
+from pipeline.core.normalize import (
+    normalize_course_name,
+    normalize_instructor_name,
+    normalize_note,
+    normalize_room,
+    normalize_target_note,
+    normalize_text,
+)
 from pipeline.models import (
     COURSE_CODE_PATTERN,
     VALID_DAYS,
@@ -121,33 +129,35 @@ def _raw_to_extracted_course(
         logger.debug("Skipping invalid/missing course code: %r", code)
         return None
 
-    name = str(raw.get("name", "")).strip()
-    instructors = [
-        str(i).strip() for i in raw.get("instructors", []) if str(i).strip()
-    ] or ["未定"]
+    name = normalize_course_name(str(raw.get("name", "")).strip())
+    raw_instructors = [
+        normalize_instructor_name(str(i)) for i in raw.get("instructors", []) if str(i).strip()
+    ]
+    cleaned_instructors = [i for i in raw_instructors if i]
+    instructors = cleaned_instructors or ["未定"]
     year_level = int(raw.get("year_level", 1) or 1)
     class_section = str(raw.get("class_section", "") or "").strip()
     if class_section in {"1", "2", "3", "4", "5"}:
         class_section = ""
 
-    notes = str(raw.get("notes", "") or "").strip()
+    notes = normalize_note(str(raw.get("notes", "") or "").strip())
     target_raw = str(raw.get("target_raw", "") or "").strip()
 
     targets: list[CourseTarget] = []
     for target in raw.get("targets", []) or []:
         tc = str(target.get("target_code", "")).strip()
-        tn = str(target.get("target_name", "")).strip()
+        tn = normalize_text(str(target.get("target_name", "")).strip())
         if tc or tn:
             targets.append(
                 CourseTarget(
                     target_code=tc,
                     target_name=tn,
-                    note=str(target.get("note", "") or "").strip(),
+                    note=normalize_target_note(str(target.get("note", "") or "").strip()),
                 )
             )
 
     day = str(raw.get("day", "") or "").strip()
-    room = str(raw.get("room", "") or "").strip()
+    room = normalize_room(str(raw.get("room", "") or "").strip())
     period_raw = raw.get("period")
     period_int: int | None = None
     if period_raw is not None:
@@ -300,7 +310,8 @@ def extract_courses_from_pdf(
   ※「前集中」「後集中」は、定期的な曜日・時限のない集中講義のみに適用されます。
 - 「対開講(月1,木1)」のような記述がある場合は paired_slots に全スロットをリストアップしてください。なお、対開講の記述は paired_slots に抽出し、notes（備考）からは除外してください。
 - 受講対象は target_raw に原文を、targets に構造化した情報を入れてください
-- instructors が複数の場合は配列に分けてください
+- instructors が複数の場合は配列に分けてください。姓と名の間は必ず「半角スペース1つ」で区切ってください（全角スペース禁止）。
+- 英数字・記号: アルファベット、数字、丸括弧 ()、スラッシュ / はすべて「半角」で出力してください（全角英数・全角記号・全角括弧は禁止）。
 - 集中講義は day, period が空になります（paired_slots も空）
 - 講義コードが無効な行はスキップしてください（形式: sm[英字2][数字6]、例: smab020161）
 """

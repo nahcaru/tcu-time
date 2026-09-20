@@ -28,17 +28,21 @@ interface SettingsContextType {
   settings: UserSettings | null
   isLoading: boolean
   updateSettings: (
-    updates: Partial<Pick<UserSettings, "department" | "earned_credits" | "theme">>
+    updates: Partial<
+      Pick<UserSettings, "department" | "earned_credits" | "theme">
+    >
   ) => Promise<void>
 }
 
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
+const SettingsContext = createContext<SettingsContextType | undefined>(
+  undefined
+)
 
 const LOCAL_STORAGE_KEY = "TIME_SETTINGS"
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  
+
   // Lazily initialize local storage state to avoid sync setState in useEffect
   const [settings, setSettings] = useState<UserSettings | null>(() => {
     if (!user) {
@@ -53,7 +57,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
     return null
   })
-  
+
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
@@ -75,7 +79,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         setSettings(data as UserSettings)
       } else if (!data) {
-         setSettings(null)
+        setSettings(null)
       }
       setIsLoading(false)
     }
@@ -87,15 +91,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const updateSettings = useCallback(
-    async (updates: Partial<Pick<UserSettings, "department" | "earned_credits" | "theme">>) => {
+    async (
+      updates: Partial<
+        Pick<UserSettings, "department" | "earned_credits" | "theme">
+      >
+    ) => {
       // Create new settings to optimistic update
       const newSettings = {
         ...settings,
         ...updates,
       } as UserSettings
-      
+
       setSettings(newSettings)
-      
+
       if (!user) {
         // Unauthenticated user - save to localStorage
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newSettings))
@@ -103,7 +111,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
 
       const payload = {
-        ...settings, 
+        ...settings,
         ...updates,
         user_id: user.id,
         updated_at: new Date().toISOString(),

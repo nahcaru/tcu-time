@@ -4,6 +4,7 @@ from typing import Any, cast
 import unicodedata
 
 from pipeline.core.academic_year import current_academic_year
+from pipeline.core.normalize import normalize_course_dict
 
 from .common import Row, first_row, get_client, now_iso
 
@@ -21,7 +22,8 @@ def upsert_courses(
     upserted: list[Row] = []
     academic_year = academic_year or current_academic_year()
 
-    for course in courses_data:
+    for raw_course in courses_data:
+        course = normalize_course_dict(raw_course)
         course_row: dict[str, Any] = {
             "code": course["code"],
             "name": course["name"],

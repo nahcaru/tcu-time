@@ -97,7 +97,7 @@ export function TimetableEditor({
                 {courseWarnings.length > 0 && (
                   <Badge
                     variant="outline"
-                    className="h-4 px-1 text-[10px] font-normal border-amber-400 bg-amber-50 text-amber-800"
+                    className="h-4 border-amber-400 bg-amber-50 px-1 text-[10px] font-normal text-amber-800"
                   >
                     検知 {courseWarnings.length}件
                   </Badge>

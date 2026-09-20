@@ -197,7 +197,10 @@ export function ReviewPage() {
       if (result.replayedChangelogs && result.replayedChangelogs > 0) {
         messages.push(`変更一覧 ${result.replayedChangelogs} 件`)
       }
-      if (result.replayedAdvanceEnrollments && result.replayedAdvanceEnrollments > 0) {
+      if (
+        result.replayedAdvanceEnrollments &&
+        result.replayedAdvanceEnrollments > 0
+      ) {
         messages.push(`先行履修 ${result.replayedAdvanceEnrollments} 件`)
       }
       const replayMsg =
@@ -291,7 +294,11 @@ export function ReviewPage() {
         })
       } else if (e.key === " " || e.key === "x") {
         e.preventDefault()
-        if (activeIndex != null && activeIndex >= 0 && activeIndex < itemCount) {
+        if (
+          activeIndex != null &&
+          activeIndex >= 0 &&
+          activeIndex < itemCount
+        ) {
           const willCheck = !checkedSet.has(activeIndex)
           toggleCheck(activeIndex, willCheck)
           if (willCheck && activeIndex < itemCount - 1) {
@@ -300,7 +307,11 @@ export function ReviewPage() {
         }
       } else if (e.key === "Enter" || e.key === "o") {
         e.preventDefault()
-        if (activeIndex != null && activeIndex >= 0 && activeIndex < itemCount) {
+        if (
+          activeIndex != null &&
+          activeIndex >= 0 &&
+          activeIndex < itemCount
+        ) {
           toggleExpand(activeIndex)
         }
       } else if (e.key === "a" || e.key === "A") {
@@ -446,7 +457,9 @@ export function ReviewPage() {
                 }
               >
                 <IconCheck className="size-4" />
-                <span>{acting ? "反映中（タブを閉じないでください）…" : "承認"}</span>
+                <span>
+                  {acting ? "反映中（タブを閉じないでください）…" : "承認"}
+                </span>
               </Button>
             )}
           </div>
@@ -513,18 +526,12 @@ export function ReviewPage() {
                     >
                       {allChecked ? "全選択解除" : "全選択"}
                     </Button>
-                    <Badge
-                      variant="outline"
-                      className="text-xs"
-                    >
+                    <Badge variant="outline" className="text-xs">
                       {checkedSet.size} / {itemCount} 確認済み
                     </Badge>
                   </>
                 ) : (
-                  <Badge
-                    variant="outline"
-                    className="text-xs"
-                  >
+                  <Badge variant="outline" className="text-xs">
                     {itemCount} 件
                   </Badge>
                 )}

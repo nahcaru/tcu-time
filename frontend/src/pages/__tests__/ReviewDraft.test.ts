@@ -57,20 +57,22 @@ describe("saveReviewDraft", () => {
     let capturedUpdate: Record<string, unknown> | null = null
     let capturedEq: { column: string; value: string } | null = null
 
-    const mockFrom = spyOn(supabase, "from").mockImplementation((table: string) => {
-      capturedTable = table
-      return {
-        update: (payload: Record<string, unknown>) => {
-          capturedUpdate = payload
-          return {
-            eq: (col: string, val: string) => {
-              capturedEq = { column: col, value: val }
-              return Promise.resolve({ error: null })
-            },
-          }
-        },
-      } as unknown as ReturnType<typeof supabase.from>
-    })
+    const mockFrom = spyOn(supabase, "from").mockImplementation(
+      (table: string) => {
+        capturedTable = table
+        return {
+          update: (payload: Record<string, unknown>) => {
+            capturedUpdate = payload
+            return {
+              eq: (col: string, val: string) => {
+                capturedEq = { column: col, value: val }
+                return Promise.resolve({ error: null })
+              },
+            }
+          },
+        } as unknown as ReturnType<typeof supabase.from>
+      }
+    )
 
     const sampleRaw: TimetableRawJson = {
       courses: [
@@ -104,7 +106,10 @@ describe("saveReviewDraft", () => {
     const mockFrom = spyOn(supabase, "from").mockImplementation(() => {
       return {
         update: () => ({
-          eq: () => Promise.resolve({ error: { message: "Database connection error" } }),
+          eq: () =>
+            Promise.resolve({
+              error: { message: "Database connection error" },
+            }),
         }),
       } as unknown as ReturnType<typeof supabase.from>
     })
@@ -125,10 +130,14 @@ describe("Review draft restoration logic", () => {
     const savedIndices = [1, 3]
 
     const restoredSet = new Set(
-      savedIndices.filter((idx) => typeof idx === "number" && idx >= 0 && idx < itemCount)
+      savedIndices.filter(
+        (idx) => typeof idx === "number" && idx >= 0 && idx < itemCount
+      )
     )
     const expandedSet = new Set(
-      Array.from({ length: itemCount }, (_, i) => i).filter((i) => !restoredSet.has(i))
+      Array.from({ length: itemCount }, (_, i) => i).filter(
+        (i) => !restoredSet.has(i)
+      )
     )
 
     expect(restoredSet.size).toBe(2)
@@ -145,7 +154,9 @@ describe("Review draft restoration logic", () => {
     const savedIndices = [-1, 0, 2, 10]
 
     const restoredSet = new Set(
-      savedIndices.filter((idx) => typeof idx === "number" && idx >= 0 && idx < itemCount)
+      savedIndices.filter(
+        (idx) => typeof idx === "number" && idx >= 0 && idx < itemCount
+      )
     )
 
     expect(Array.from(restoredSet).sort()).toEqual([0, 2])

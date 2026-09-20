@@ -108,7 +108,7 @@ export function AddButton({
       variant="outline"
       size="xs"
       onClick={onClick}
-      className="gap-1 text-xs border-dashed text-primary hover:text-primary hover:bg-primary/5"
+      className="gap-1 border-dashed text-xs text-primary hover:bg-primary/5 hover:text-primary"
     >
       <IconPlus className="size-3" />
       <span>{cleanLabel}</span>
