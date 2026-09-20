@@ -12,7 +12,7 @@ export function CourseCardSkeleton() {
         </div>
 
         {/* Title & Metadata */}
-        <div className="min-w-0 flex-1 flex flex-col gap-1 sm:block sm:space-y-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:block sm:space-y-2">
           <Skeleton className="h-5 w-3/4 max-w-sm" />
           <div className="flex items-center gap-2">
             <Skeleton className="h-3 w-24 sm:h-3.5" />

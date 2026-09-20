@@ -154,7 +154,8 @@ export function ExtractionList() {
             />
             <span>最新版のみ</span>
             <span className="text-[11px] text-muted-foreground">
-              ({displayedExtractions.length} / {statusFilteredExtractions.length}件)
+              ({displayedExtractions.length} /{" "}
+              {statusFilteredExtractions.length}件)
             </span>
           </Button>
         </div>

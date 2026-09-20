@@ -52,13 +52,8 @@ export function AppSidebar() {
   const { theme, resolvedTheme, setTheme } = useTheme()
   const { user } = useAuth()
   const { resetAndStartTour } = useTutorial()
-  const {
-    spring,
-    fall,
-    hasAdvance,
-    advanceUpdatedAt,
-    targetYear,
-  } = useDataSources()
+  const { spring, fall, hasAdvance, advanceUpdatedAt, targetYear } =
+    useDataSources()
 
   const formatShortDate = (isoString: string | null) => {
     if (!isoString) return ""
@@ -177,10 +172,11 @@ export function AppSidebar() {
                     tooltip="データ取得元と取得日"
                     className="h-auto cursor-default py-2 hover:bg-transparent hover:text-sidebar-foreground"
                   >
-                    <IconDatabase className="text-muted-foreground shrink-0" />
+                    <IconDatabase className="shrink-0 text-muted-foreground" />
                     <div className="flex flex-col items-start gap-1">
                       <span className="text-xs font-semibold text-muted-foreground">
-                        科目データ取得元{targetYear ? ` (${targetYear}年度)` : ""}
+                        科目データ取得元
+                        {targetYear ? ` (${targetYear}年度)` : ""}
                       </span>
                       <div className="mt-1 flex w-full flex-col gap-1.5 text-[10px] leading-tight text-muted-foreground">
                         {spring && (
@@ -190,7 +186,8 @@ export function AppSidebar() {
                                 前期
                               </span>
                               <span>
-                                教学課 授業時間表{spring.isTentative ? "(暫定)" : ""}{" "}
+                                教学課 授業時間表
+                                {spring.isTentative ? "(暫定)" : ""}{" "}
                                 <span className="ml-1">
                                   {formatShortDate(spring.updatedAt)}
                                 </span>

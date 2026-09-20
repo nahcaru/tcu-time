@@ -14,6 +14,13 @@ from pipeline.adapters.gemini import (
     generate_pdf_json,
     run_with_model_fallback,
 )
+from pipeline.core.normalize import (
+    normalize_course_name,
+    normalize_instructor_name,
+    normalize_note,
+    normalize_room,
+    normalize_target_note,
+)
 from pipeline.core.settings import Settings
 from pipeline.models import ChangeEntry, CourseTarget, FieldChange, Schedule
 
@@ -63,6 +70,8 @@ GEMINI_CHANGELOG_PROMPT = """
 2. フィールド抽出とテキスト整形：
    - 教室名: セル内で改行されて「12N \n → 共用演習室」となっている場合、old_value は "12N", new_value は "共用演習室" です。数値を勝手に分割したり（"1" と "2N" など）しないでください。
    - 講義コード: "smab030111" や "smaz030191" などの文字列から、0や英数字を絶対に省略・欠落させないでください。
+   - 英数字・記号: アルファベット、数字、丸括弧 ()、スラッシュ / はすべて「半角」で出力してください（全角英数・全角記号は禁止）。
+   - 教員名: 姓と名の間は必ず「半角スペース1つ」で区切ってください（全角スペース禁止）。
    - 改行の除去: セル内の単語途中の改行（\n）は除去して結合してください（例: "Sustainable Cyber-\nPhysical Systems" → "Sustainable Cyber-Physical Systems"）。
    - 列名: changes 内の field には「教室」「担当者」「曜日時限」などの表の列名をそのまま設定してください。
 """
@@ -409,33 +418,89 @@ def _generate_changes_with_model(model: str, pdf_bytes: bytes) -> list[ChangeEnt
     return _parse_gemini_json(raw_text)
 
 
+def _normalize_change_entry(entry: ChangeEntry) -> ChangeEntry:
+    course_name = normalize_course_name(entry.course_name)
+    instructors = [
+        normalize_instructor_name(i) for i in entry.instructors if normalize_instructor_name(i)
+    ]
+    room = normalize_room(entry.room) if entry.room else None
+
+    # Normalize field changes
+    norm_changes = []
+    for fc in entry.changes:
+        field = fc.field
+        old_val = fc.old_value
+        new_val = fc.new_value
+        if "科目" in field:
+            old_val = normalize_course_name(old_val) if old_val else old_val
+            new_val = normalize_course_name(new_val) if new_val else new_val
+        elif "教員" in field or "担当" in field:
+            old_val = normalize_instructor_name(old_val) if old_val else old_val
+            new_val = normalize_instructor_name(new_val) if new_val else new_val
+        elif "教室" in field:
+            old_val = normalize_room(old_val) if old_val else old_val
+            new_val = normalize_room(new_val) if new_val else new_val
+        norm_changes.append(FieldChange(field=field, old_value=old_val, new_value=new_val))
+
+    # Normalize targets
+    norm_targets = []
+    for t in entry.targets:
+        norm_targets.append(
+            CourseTarget(
+                target_code=t.target_code,
+                target_name=normalize_course_name(t.target_name),
+                note=normalize_target_note(t.note),
+            )
+        )
+
+    return ChangeEntry(
+        change_type=entry.change_type,
+        course_code=entry.course_code,
+        course_name=course_name,
+        term=entry.term,
+        day=entry.day,
+        period=entry.period,
+        schedules=entry.schedules,
+        instructors=instructors,
+        room=room,
+        targets=norm_targets,
+        changes=norm_changes,
+    )
+
+
 def parse_changelog(pdf_bytes: bytes) -> list[ChangeEntry]:
     """Parse changelog PDF bytes into a list of ChangeEntry.
 
     Attempts table-based extraction via pdfplumber first.
     If no changelog table or entries are found, falls back to Gemini.
     """
+    entries: list[ChangeEntry] = []
     try:
-        entries = extract_changelog_from_pdf_tables(pdf_bytes)
-        if entries:
+        table_entries = extract_changelog_from_pdf_tables(pdf_bytes)
+        if table_entries:
             logger.info(
                 "Successfully extracted %d changelog entries from PDF tables",
-                len(entries),
+                len(table_entries),
             )
-            return entries
-        logger.info(
-            "No changelog table entries found via pdfplumber; falling back to Gemini model"
-        )
+            entries = table_entries
+        else:
+            logger.info(
+                "No changelog table entries found via pdfplumber; falling back to Gemini model"
+            )
     except Exception as e:
         logger.info(
             "Table-based extraction failed (%s); falling back to Gemini model",
             e,
         )
 
-    return run_with_model_fallback(
-        primary_model=Settings.GEMINI_MODEL,
-        fallback_model=Settings.GEMINI_FALLBACK_MODEL,
-        runner=lambda model: _generate_changes_with_model(model, pdf_bytes),
-        logger=logger,
-    )
+    if not entries:
+        entries = run_with_model_fallback(
+            primary_model=Settings.GEMINI_MODEL,
+            fallback_model=Settings.GEMINI_FALLBACK_MODEL,
+            runner=lambda model: _generate_changes_with_model(model, pdf_bytes),
+            logger=logger,
+        )
+
+    return [_normalize_change_entry(e) for e in entries]
+
 

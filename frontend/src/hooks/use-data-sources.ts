@@ -88,7 +88,9 @@ export function useDataSources(): DataSourceStatus {
       // 3. Fetch courses summary for targetYear
       const { data: coursesData } = await supabase
         .from("courses")
-        .select("source_type, term, is_tentative, advance_enrollment, updated_at")
+        .select(
+          "source_type, term, is_tentative, advance_enrollment, updated_at"
+        )
         .eq("academic_year", targetYear)
 
       if (cancelled) return
@@ -180,8 +182,7 @@ export function resolveDataSources(
   )
   const changelogCourses = courses.filter((c) => c.source_type === "changelog")
   const hasChangelog =
-    approvedChangelogs.length > 0 ||
-    changelogCourses.length > 0
+    approvedChangelogs.length > 0 || changelogCourses.length > 0
   const changelogUpdatedAt =
     getExtDate(approvedChangelogs[0]) ??
     getMaxDate(changelogCourses.map((c) => c.updated_at))
@@ -193,9 +194,7 @@ export function resolveDataSources(
       (e.status === "approved" || !e.status)
   )
   const advanceCourses = courses.filter((c) => c.advance_enrollment === true)
-  const hasAdvance =
-    approvedAdvance.length > 0 ||
-    advanceCourses.length > 0
+  const hasAdvance = approvedAdvance.length > 0 || advanceCourses.length > 0
   const advanceUpdatedAt =
     getExtDate(approvedAdvance[0]) ??
     getMaxDate(advanceCourses.map((c) => c.updated_at))
@@ -264,7 +263,9 @@ export function resolveDataSources(
     const isTentative =
       fallTimetableExt?.is_tentative ??
       fallTimetableCourses.some((c) => c.is_tentative)
-    const maxFallUpdate = getMaxDate(fallTimetableCourses.map((c) => c.updated_at))
+    const maxFallUpdate = getMaxDate(
+      fallTimetableCourses.map((c) => c.updated_at)
+    )
     fallSource = {
       type: "timetable",
       isTentative: Boolean(isTentative),
@@ -273,7 +274,9 @@ export function resolveDataSources(
       changelogUpdatedAt: fallChangelogUpdatedAt,
     }
   } else if (fallSyllabusCourses.length > 0) {
-    const maxSyllabusUpdate = getMaxDate(fallSyllabusCourses.map((c) => c.updated_at))
+    const maxSyllabusUpdate = getMaxDate(
+      fallSyllabusCourses.map((c) => c.updated_at)
+    )
     fallSource = {
       type: "syllabus",
       isTentative: true,
@@ -288,7 +291,7 @@ export function resolveDataSources(
   const timetableUpdatedAt =
     springSource?.updatedAt ?? fallSource?.updatedAt ?? null
   const hasSyllabus = fallSource?.type === "syllabus"
-  const syllabusUpdatedAt = hasSyllabus ? fallSource?.updatedAt ?? null : null
+  const syllabusUpdatedAt = hasSyllabus ? (fallSource?.updatedAt ?? null) : null
 
   return {
     spring: springSource,

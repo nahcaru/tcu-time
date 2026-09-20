@@ -39,10 +39,7 @@ export function TargetsEditor({
   return (
     <div className={cn("space-y-2", className)}>
       {!hideHeader && (
-        <FormSectionHeader
-          title={label}
-          count={targets.length}
-        />
+        <FormSectionHeader title={label} count={targets.length} />
       )}
       {targets.length > 0 && (
         <div className="space-y-2">

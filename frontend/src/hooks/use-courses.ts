@@ -8,6 +8,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import type { CourseWithRelations } from "@/lib/database.types"
 import { matchesTarget } from "@/lib/constants"
+import { normalizeSearchText } from "@/lib/normalize"
 
 export interface CourseFilters {
   targets?: string[]
@@ -151,9 +152,7 @@ export function useCourses(filters?: CourseFilters) {
   // Filter by terms
   if (filters?.terms && filters.terms.length > 0) {
     const termSet = new Set(filters.terms)
-    courses = courses.filter((c) =>
-      c.term != null && termSet.has(c.term)
-    )
+    courses = courses.filter((c) => c.term != null && termSet.has(c.term))
   }
 
   // Enrolled only filter
@@ -198,11 +197,11 @@ export function useCourses(filters?: CourseFilters) {
 
   // Text search (name or instructor)
   if (filters?.search && filters.search.trim()) {
-    const q = filters.search.trim().toLowerCase()
+    const q = normalizeSearchText(filters.search)
     courses = courses.filter(
       (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.instructors.some((i) => i.toLowerCase().includes(q))
+        normalizeSearchText(c.name).includes(q) ||
+        c.instructors.some((i) => normalizeSearchText(i).includes(q))
     )
   }
 

@@ -147,8 +147,8 @@ describe("resolveDataSources", () => {
         is_tentative: false,
         status: "approved",
         published_at: "2026-09-10T18:43:34+09:00", // actual release date
-        created_at: "2026-09-13T14:51:24Z",        // crawler date
-        updated_at: "2026-09-15T06:28:26Z",        // approval date
+        created_at: "2026-09-13T14:51:24Z", // crawler date
+        updated_at: "2026-09-15T06:28:26Z", // approval date
       },
       {
         pdf_type: "timetable",

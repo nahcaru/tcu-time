@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pipeline.models import VALID_DAYS, ExtractedCourse
@@ -151,6 +152,54 @@ def validate_extracted_courses(
                     name=name,
                     field="instructors",
                     message="担当教員が未設定または '未定' です。",
+                    severity="info",
+                )
+            )
+
+        # 6. Fullwidth space in instructor names
+        for inst in cleaned_instructors:
+            if "\u3000" in inst:
+                warnings.append(
+                    ValidationWarning(
+                        code=code,
+                        name=name,
+                        field="instructors",
+                        message=f"担当教員名 '{inst}' に全角スペースが含まれています。",
+                        severity="warning",
+                    )
+                )
+                break
+
+        # 7. Fullwidth alphanumeric characters in course name
+        if re.search(r"[\uff21-\uff3a\uff41-\uff5a\uff10-\uff19]", name):
+            warnings.append(
+                ValidationWarning(
+                    code=code,
+                    name=name,
+                    field="name",
+                    message=f"科目名 '{name}' に全角英数字が含まれています。",
+                    severity="warning",
+                )
+            )
+
+        # 8. Fullwidth parentheses or slashes in course name or room
+        if re.search(r"[（）／]", name):
+            warnings.append(
+                ValidationWarning(
+                    code=code,
+                    name=name,
+                    field="name",
+                    message=f"科目名 '{name}' に全角記号（括弧・スラッシュ等）が含まれています。",
+                    severity="info",
+                )
+            )
+        if room and re.search(r"[（）／]", room):
+            warnings.append(
+                ValidationWarning(
+                    code=code,
+                    name=name,
+                    field="room",
+                    message=f"教室名 '{room}' に全角記号（括弧等）が含まれています。",
                     severity="info",
                 )
             )

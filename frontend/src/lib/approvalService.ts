@@ -13,6 +13,12 @@ import type { Database, Json } from "@/lib/database.types"
 // ---------------------------------------------------------------------------
 
 import { inferTerm, VALID_TERMS, type ValidTerm } from "./termInference"
+import {
+  normalizeCourseName,
+  normalizeInstructorName,
+  normalizeNote,
+  normalizeRoom,
+} from "./normalize"
 
 export const VALID_DAYS = ["月", "火", "水", "木", "金", "土"] as const
 export { VALID_TERMS, type ValidTerm, inferTerm }
@@ -80,7 +86,9 @@ export function parseSingleTarget(raw: string): RawTarget {
     note = noteMatch[2].trim()
   }
 
-  const codeMatch = base.match(/^([0-9]{1,2}[A-Za-z]?|[A-Za-z0-9]+)[\s:：\-・]*(.*)$/)
+  const codeMatch = base.match(
+    /^([0-9]{1,2}[A-Za-z]?|[A-Za-z0-9]+)[\s:：\-・]*(.*)$/
+  )
   if (codeMatch && /^\d/.test(codeMatch[1])) {
     return {
       target_code: codeMatch[1],
@@ -96,7 +104,9 @@ export function parseSingleTarget(raw: string): RawTarget {
   }
 }
 
-export function parseTargetsString(raw: string | null | undefined): RawTarget[] {
+export function parseTargetsString(
+  raw: string | null | undefined
+): RawTarget[] {
   if (!raw) return []
   return raw
     .split(/[,、\n]/)
@@ -215,24 +225,31 @@ async function applyTimetableApproval(
   const year = academic_year ?? new Date().getFullYear()
 
   // 1. Prepare all course rows
-  const coursePayloads = courses.map((course) => ({
-    code: course.code,
-    name: course.name,
-    instructors: course.instructors,
-    year_level: course.year_level ?? 1,
-    class_section: course.class_section ?? "",
-    notes: course.notes ?? "",
-    academic_year: year,
-    is_tentative,
-    extraction_id: extractionId,
-    status: "active",
-    source_type: "timetable",
-    term:
-      course.term && (VALID_TERMS as readonly string[]).includes(course.term)
-        ? (course.term as ValidTerm)
-        : inferTerm(course, semester),
-    room: course.room,
-  }))
+  const coursePayloads = courses.map((course) => {
+    const rawInstructors = (course.instructors ?? [])
+      .map(normalizeInstructorName)
+      .filter(Boolean)
+    const instructors = rawInstructors.length > 0 ? rawInstructors : ["未定"]
+
+    return {
+      code: course.code,
+      name: normalizeCourseName(course.name),
+      instructors,
+      year_level: course.year_level ?? 1,
+      class_section: course.class_section ?? "",
+      notes: normalizeNote(course.notes ?? ""),
+      academic_year: year,
+      is_tentative,
+      extraction_id: extractionId,
+      status: "active",
+      source_type: "timetable",
+      term:
+        course.term && (VALID_TERMS as readonly string[]).includes(course.term)
+          ? (course.term as ValidTerm)
+          : inferTerm(course, semester),
+      room: course.room ? normalizeRoom(course.room) : null,
+    }
+  })
 
   if (coursePayloads.length === 0) {
     return { count: 0, replayedChangelogs: 0, replayedAdvanceEnrollments: 0 }
@@ -253,7 +270,11 @@ async function applyTimetableApproval(
   const allCourseIds = upsertedRows.map((r) => r.id)
 
   // 3. Prepare all schedules and targets
-  const allSchedules: Array<{ course_id: string; day: string; period: number }> = []
+  const allSchedules: Array<{
+    course_id: string
+    day: string
+    period: number
+  }> = []
   const allTargets: Array<{
     course_id: string
     target_code: string
@@ -280,8 +301,8 @@ async function applyTimetableApproval(
         allTargets.push({
           course_id: courseId,
           target_code: t.target_code,
-          target_name: t.target_name,
-          note: t.note ?? "",
+          target_name: t.target_name ? normalizeCourseName(t.target_name) : "",
+          note: normalizeNote(t.note ?? ""),
         })
       }
     }
@@ -324,7 +345,8 @@ async function applyTimetableApproval(
   // and so late or definitive timetable approvals preserve advance enrollment.
   let replayedAdvanceEnrollments = 0
   try {
-    const replayAdvanceResult = await replayApprovedAdvanceEnrollment(academic_year)
+    const replayAdvanceResult =
+      await replayApprovedAdvanceEnrollment(academic_year)
     replayedAdvanceEnrollments = replayAdvanceResult.extractionCount
   } catch (err) {
     console.warn("Failed to auto-replay approved advance enrollment:", err)
@@ -358,7 +380,10 @@ export async function replayApprovedAdvanceEnrollment(
     }
   }
 
-  return { extractionCount: advanceExtractions.length, courseCount: totalCourses }
+  return {
+    extractionCount: advanceExtractions.length,
+    courseCount: totalCourses,
+  }
 }
 
 export async function replayApprovedChangelogs(
@@ -411,19 +436,19 @@ async function applyChangelogApproval(
     if (change.change_type === "create") {
       if (!change.course_name) continue
 
-      const instructors =
-        change.instructors && change.instructors.length > 0
-          ? change.instructors
-          : ["未定"]
+      const rawInstructors = (change.instructors ?? [])
+        .map(normalizeInstructorName)
+        .filter(Boolean)
+      const instructors = rawInstructors.length > 0 ? rawInstructors : ["未定"]
 
       const { data: courseRow, error: courseErr } = await supabase
         .from("courses")
         .upsert(
           {
             code: change.course_code ?? "",
-            name: change.course_name,
+            name: normalizeCourseName(change.course_name),
             instructors,
-            room: change.room ?? null,
+            room: change.room ? normalizeRoom(change.room) : null,
             term: change.term ?? null,
             academic_year: academic_year ?? new Date().getFullYear(),
             status: "active",
@@ -458,7 +483,10 @@ async function applyChangelogApproval(
         }
 
         if (change.targets && change.targets.length > 0) {
-          await supabase.from("course_targets").delete().eq("course_id", courseId)
+          await supabase
+            .from("course_targets")
+            .delete()
+            .eq("course_id", courseId)
           await supabase.from("course_targets").insert(
             change.targets.map((t) => ({
               course_id: courseId,
@@ -495,20 +523,23 @@ async function applyChangelogApproval(
       } else {
         const updates: Record<string, unknown> = {}
         const fieldMap: Record<string, string> = {
-          "教室": "room",
-          "担当者": "instructors",
-          "科目名": "name",
-          "備考": "notes",
-          "学期": "term",
-          "開講期": "term",
-          "講義コード": "code",
+          教室: "room",
+          担当者: "instructors",
+          科目名: "name",
+          備考: "notes",
+          学期: "term",
+          開講期: "term",
+          講義コード: "code",
         }
         for (const fc of change.changes ?? []) {
           const field = fc.field.trim()
           if (field === "曜日時限" || field === "時限" || field === "曜日") {
             const newScheds = parseScheduleString(fc.new_value)
             if (newScheds.length > 0) {
-              await supabase.from("schedules").delete().eq("course_id", found.id)
+              await supabase
+                .from("schedules")
+                .delete()
+                .eq("course_id", found.id)
               await supabase.from("schedules").insert(
                 newScheds.map((s) => ({
                   course_id: found.id,
@@ -529,8 +560,10 @@ async function applyChangelogApproval(
                   targets.map((t) => ({
                     course_id: found.id,
                     target_code: t.target_code,
-                    target_name: t.target_name,
-                    note: t.note ?? "",
+                    target_name: t.target_name
+                      ? normalizeCourseName(t.target_name)
+                      : "",
+                    note: normalizeNote(t.note ?? ""),
                   }))
                 )
               }
@@ -539,8 +572,19 @@ async function applyChangelogApproval(
             const key = fieldMap[field] ?? field
             if (key === "instructors") {
               updates[key] = fc.new_value
-                ? fc.new_value.split(/[,、]/).map((s) => s.trim()).filter(Boolean)
+                ? fc.new_value
+                    .split(/[,、]/)
+                    .map(normalizeInstructorName)
+                    .filter(Boolean)
                 : ["未定"]
+            } else if (key === "name") {
+              updates[key] = fc.new_value
+                ? normalizeCourseName(fc.new_value)
+                : ""
+            } else if (key === "room") {
+              updates[key] = fc.new_value ? normalizeRoom(fc.new_value) : ""
+            } else if (key === "notes") {
+              updates[key] = fc.new_value ? normalizeNote(fc.new_value) : ""
             } else {
               updates[key] = fc.new_value
             }
@@ -549,7 +593,9 @@ async function applyChangelogApproval(
         if (Object.keys(updates).length > 0) {
           await supabase
             .from("courses")
-            .update(updates as Database["public"]["Tables"]["courses"]["Update"])
+            .update(
+              updates as Database["public"]["Tables"]["courses"]["Update"]
+            )
             .eq("id", found.id)
         }
       }

@@ -9,6 +9,7 @@ import { CourseCardSkeleton } from "@/components/course/CourseCardSkeleton"
 import type { CourseWithRelations } from "@/lib/database.types"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { usePageTutorial } from "@/hooks/use-page-tutorial"
+import { normalizeCourseName, normalizeInstructorName } from "@/lib/normalize"
 
 export function CoursesPage() {
   // Tutorial
@@ -61,8 +62,12 @@ export function CoursesPage() {
   const suggestions = useMemo(() => {
     const items = new Set<string>()
     suggestionBase.forEach((c) => {
-      items.add(c.name)
-      c.instructors.forEach((i) => items.add(i))
+      const nName = normalizeCourseName(c.name)
+      if (nName) items.add(nName)
+      c.instructors.forEach((i) => {
+        const nInst = normalizeInstructorName(i)
+        if (nInst) items.add(nInst)
+      })
     })
     return Array.from(items)
   }, [suggestionBase])

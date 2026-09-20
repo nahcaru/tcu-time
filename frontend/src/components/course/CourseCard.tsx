@@ -42,18 +42,18 @@ export function CourseCard({
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
         {/* Mobile: inline text, Desktop: left column stacked */}
-        <div className="flex flex-row flex-wrap items-center gap-x-1.5 text-xs font-medium leading-none text-muted-foreground sm:w-20 sm:shrink-0 sm:flex-col sm:items-start sm:gap-0.5 sm:pt-0.5 sm:text-sm sm:leading-normal">
+        <div className="flex flex-row flex-wrap items-center gap-x-1.5 text-xs leading-none font-medium text-muted-foreground sm:w-20 sm:shrink-0 sm:flex-col sm:items-start sm:gap-0.5 sm:pt-0.5 sm:text-sm sm:leading-normal">
           <span>{termText || "学期未定"}</span>
           {displaySchedule && <span>{displaySchedule}</span>}
         </div>
 
         {/* Right column (desktop) / Bottom part (mobile) */}
-        <div className="min-w-0 flex-1 flex flex-col gap-1 sm:block sm:space-y-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:block sm:space-y-1">
           <a
             href={syllabusUrl(course.academic_year.toString(), course.code)}
             target="_blank"
             rel="noopener noreferrer"
-            className="block max-w-full truncate text-base font-semibold leading-tight text-sidebar-primary hover:underline sm:inline-block sm:text-lg sm:leading-normal"
+            className="block max-w-full truncate text-base leading-tight font-semibold text-sidebar-primary hover:underline sm:inline-block sm:text-lg sm:leading-normal"
             onClick={(e) => {
               e.stopPropagation()
             }}

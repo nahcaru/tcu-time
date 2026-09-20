@@ -34,9 +34,12 @@ async function getDeleteErrorMessage(error: unknown): Promise<string> {
   if (error instanceof FunctionsHttpError) {
     try {
       const body = await error.context.json()
-      if (body?.error === "unauthorized") return "認証エラーです。再ログインしてください。"
-      if (body?.error === "delete_failed") return "アカウント削除に失敗しました。"
-      if (body?.error === "server_error") return "サーバーエラーが発生しました。"
+      if (body?.error === "unauthorized")
+        return "認証エラーです。再ログインしてください。"
+      if (body?.error === "delete_failed")
+        return "アカウント削除に失敗しました。"
+      if (body?.error === "server_error")
+        return "サーバーエラーが発生しました。"
     } catch {
       return "アカウント削除に失敗しました。"
     }

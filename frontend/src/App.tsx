@@ -12,21 +12,21 @@ export function App() {
   return (
     <SettingsProvider>
       <TutorialProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<CoursesPage />} />
-            <Route path="timetable" element={<TimetablePage />} />
-            <Route element={<AdminRoute />}>
-              <Route path="admin" element={<AdminPage />} />
-              <Route
-                path="admin/review/:extractionId"
-                element={<ReviewPage />}
-              />
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<CoursesPage />} />
+              <Route path="timetable" element={<TimetablePage />} />
+              <Route element={<AdminRoute />}>
+                <Route path="admin" element={<AdminPage />} />
+                <Route
+                  path="admin/review/:extractionId"
+                  element={<ReviewPage />}
+                />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
       </TutorialProvider>
     </SettingsProvider>
   )

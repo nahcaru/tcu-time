@@ -42,10 +42,11 @@ export function KeyboardShortcutsDialog({
         <DialogHeader>
           <DialogTitle>キーボードショートカット</DialogTitle>
           <DialogDescription>
-            レビューを素早く行うための操作です。入力フォーム入力中以外に有効です（⌘S / ⌘Enter は入力中も有効）。
+            レビューを素早く行うための操作です。入力フォーム入力中以外に有効です（⌘S
+            / ⌘Enter は入力中も有効）。
           </DialogDescription>
         </DialogHeader>
-        <div className="divide-y divide-border text-sm pt-2">
+        <div className="divide-y divide-border pt-2 text-sm">
           {SHORTCUTS.map((s) => (
             <div
               key={s.desc}
@@ -60,7 +61,7 @@ export function KeyboardShortcutsDialog({
                         {s.operator}
                       </span>
                     )}
-                    <Kbd className="font-mono text-xs border shadow-xs">
+                    <Kbd className="border font-mono text-xs shadow-xs">
                       {k}
                     </Kbd>
                   </span>

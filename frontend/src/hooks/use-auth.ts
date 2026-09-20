@@ -18,7 +18,7 @@ export function useAuth() {
     if (storedSettings) {
       try {
         const parsedSettings = JSON.parse(storedSettings) as UserSettings
-        
+
         // Fetch existing remote settings to merge
         const { data: remoteSettings } = await supabase
           .from("user_settings")
@@ -36,7 +36,7 @@ export function useAuth() {
         await supabase
           .from("user_settings")
           .upsert(payload, { onConflict: "user_id" })
-          
+
         localStorage.removeItem(LOCAL_SETTINGS_KEY)
       } catch (e) {
         console.error("Failed to sync local settings", e)
@@ -47,8 +47,10 @@ export function useAuth() {
     const storedEnrollments = localStorage.getItem(LOCAL_ENROLLMENTS_KEY)
     if (storedEnrollments) {
       try {
-        const parsedEnrollments = JSON.parse(storedEnrollments) as UserEnrollment[]
-        
+        const parsedEnrollments = JSON.parse(
+          storedEnrollments
+        ) as UserEnrollment[]
+
         if (parsedEnrollments.length > 0) {
           const enrollmentsPayload = parsedEnrollments.map((e) => ({
             user_id: authUser.id,
@@ -57,13 +59,13 @@ export function useAuth() {
           }))
 
           // For enrollments, we use insert with onConflict ignore, but currently we just do a regular insert.
-          // Since the PK is (user_id, course_id), we should upsert with `ignoreDuplicates: true` 
+          // Since the PK is (user_id, course_id), we should upsert with `ignoreDuplicates: true`
           // to prevent errors for already enrolled courses.
           await supabase
             .from("user_enrollments")
             .upsert(enrollmentsPayload, { onConflict: "user_id, course_id" })
         }
-        
+
         localStorage.removeItem(LOCAL_ENROLLMENTS_KEY)
       } catch (e) {
         console.error("Failed to sync local enrollments", e)
@@ -78,7 +80,7 @@ export function useAuth() {
       currentUserIdRef.current = session?.user?.id ?? null
       isInitializedRef.current = true
       setIsLoading(false)
-      
+
       if (session?.user) {
         void syncLocalData(session.user)
       }
