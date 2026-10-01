@@ -7,6 +7,7 @@ from pipeline.core.normalize import (
     normalize_course_name,
     normalize_instructor_name,
     normalize_note,
+    normalize_change_field,
     normalize_room,
     normalize_target_note,
 )
@@ -54,6 +55,12 @@ def test_normalize_room():
     # Fullwidth alphanumeric in room
     assert normalize_room("１３Ａ") == "13A"
     assert normalize_room(None) == ""
+    # Trailing "教室" suffix is dropped only after a room code
+    assert normalize_room("21B教室") == "21B"
+    assert normalize_room("１２Ｈ 教室") == "12H"
+    assert normalize_room("12P/12M教室") == "12P/12M"
+    assert normalize_room("共用演習室") == "共用演習室"
+    assert normalize_room("教室") == "教室"
 
 
 def test_normalize_target_note():
@@ -88,3 +95,19 @@ def test_normalize_course_dict():
     assert normalized["room"] == "臨床実習室(2号館3階)"
     assert normalized["notes"] == "対開講(月2,火2)"
     assert normalized["targets"][0]["note"] == "~25都市特論"
+
+
+def test_normalize_change_field():
+    assert normalize_change_field("教室変更") == "教室"
+    assert normalize_change_field("教室") == "教室"
+    assert normalize_change_field("担当教員追加") == "担当者"
+    assert normalize_change_field("担当者") == "担当者"
+    assert normalize_change_field("科目名") == "科目名"
+    assert normalize_change_field("講義名変更") == "科目名"
+    assert normalize_change_field("講義コード") == "講義コード"
+    assert normalize_change_field("曜日時限") == "曜日時限"
+    assert normalize_change_field("開講期") == "学期"
+    assert normalize_change_field("受講対象") == "受講対象"
+    assert normalize_change_field("備考") == "備考"
+    assert normalize_change_field("定員") == "定員"
+    assert normalize_change_field(None) == ""

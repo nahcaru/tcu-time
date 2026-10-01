@@ -425,11 +425,51 @@ export async function replayApprovedChangelogs(
 // Changelog approval
 // ---------------------------------------------------------------------------
 
+// 変更項目名 → courses カラム。管理画面の「変更項目」と1対1で、ここにない項目は反映しない。
+const CHANGELOG_FIELD_MAP: Record<string, string> = {
+  教室: "room",
+  担当者: "instructors",
+  科目名: "name",
+  備考: "notes",
+  学期: "term",
+  開講期: "term",
+  講義コード: "code",
+}
+const CHANGELOG_SCHEDULE_FIELDS = ["曜日時限", "時限", "曜日"]
+const CHANGELOG_TARGET_FIELDS = ["受講対象", "履修対象"]
+
+/**
+ * 管理画面で表示・編集された内容をそのまま反映するため、反映先が不明な変更項目は
+ * 黙って無視せず、DB に書き込む前にエラーとして承認を中断する。
+ */
+function assertSupportedChangelogFields(changes: ChangelogRawJson["changes"]) {
+  const unsupported = new Set<string>()
+  for (const change of changes ?? []) {
+    if (change.change_type !== "update") continue
+    for (const fc of change.changes ?? []) {
+      const field = fc.field.trim()
+      if (
+        !(field in CHANGELOG_FIELD_MAP) &&
+        !CHANGELOG_SCHEDULE_FIELDS.includes(field) &&
+        !CHANGELOG_TARGET_FIELDS.includes(field)
+      ) {
+        unsupported.add(field || "（項目名なし）")
+      }
+    }
+  }
+  if (unsupported.size > 0) {
+    throw new Error(
+      `反映先が未対応の変更項目があります: ${[...unsupported].join(", ")}。管理画面で変更項目を修正してください。`
+    )
+  }
+}
+
 async function applyChangelogApproval(
   extractionId: string,
   raw: ChangelogRawJson
 ): Promise<number> {
   const { changes = [], academic_year } = raw
+  assertSupportedChangelogFields(changes)
   let count = 0
 
   for (const change of changes) {
@@ -522,18 +562,9 @@ async function applyChangelogApproval(
           .eq("id", found.id)
       } else {
         const updates: Record<string, unknown> = {}
-        const fieldMap: Record<string, string> = {
-          教室: "room",
-          担当者: "instructors",
-          科目名: "name",
-          備考: "notes",
-          学期: "term",
-          開講期: "term",
-          講義コード: "code",
-        }
         for (const fc of change.changes ?? []) {
           const field = fc.field.trim()
-          if (field === "曜日時限" || field === "時限" || field === "曜日") {
+          if (CHANGELOG_SCHEDULE_FIELDS.includes(field)) {
             const newScheds = parseScheduleString(fc.new_value)
             if (newScheds.length > 0) {
               await supabase
@@ -548,7 +579,7 @@ async function applyChangelogApproval(
                 }))
               )
             }
-          } else if (field === "受講対象" || field === "履修対象") {
+          } else if (CHANGELOG_TARGET_FIELDS.includes(field)) {
             if (fc.new_value) {
               const targets = parseTargetsString(fc.new_value)
               if (targets.length > 0) {
@@ -569,7 +600,7 @@ async function applyChangelogApproval(
               }
             }
           } else {
-            const key = fieldMap[field] ?? field
+            const key = CHANGELOG_FIELD_MAP[field]
             if (key === "instructors") {
               updates[key] = fc.new_value
                 ? fc.new_value
