@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -80,7 +81,7 @@ def check_for_updates(
         return []
 
     stored = get_stored_pdf_links()
-    queued: list[dict[str, str]] = []
+    queued: list[dict[str, Any]] = []
 
     for link in current_links:
         if "環境情報" in link.label or "環境情報" in link.url:
@@ -138,6 +139,7 @@ def check_for_updates(
                 "action": action,
                 "pdf_type": metadata.pdf_type.value,
                 "semester": metadata.semester.value if metadata.semester else "both",
+                "academic_year": academic_year,
             }
         )
 

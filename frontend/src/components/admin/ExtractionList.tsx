@@ -81,6 +81,24 @@ export function ExtractionList() {
     }, 0)
   }, [extractions])
 
+  // Latest extraction of each document identity: (academic_year, pdf_type, semester).
+  // Computed over ALL extractions regardless of the status tab, so an older unapproved
+  // extraction is not shown as "latest" just because its newer sibling is already approved.
+  const latestIds = useMemo(() => {
+    const sorted = [...extractions].sort((a, b) =>
+      (b.created_at ?? "").localeCompare(a.created_at ?? "")
+    )
+    const seen = new Set<string>()
+    const ids = new Set<string>()
+    for (const ext of sorted) {
+      const docKey = `${ext.academic_year ?? "any"}_${ext.pdf_type ?? "unknown"}_${ext.semester ?? "all"}`
+      if (seen.has(docKey)) continue
+      seen.add(docKey)
+      ids.add(ext.id)
+    }
+    return ids
+  }, [extractions])
+
   // Filter by status tab
   const statusFilteredExtractions = useMemo(() => {
     if (filter === "all") return extractions
@@ -97,15 +115,8 @@ export function ExtractionList() {
 
     if (!latestOnly) return list
 
-    const seen = new Set<string>()
-    return list.filter((ext) => {
-      // Group by document identity: (academic_year, pdf_type, semester)
-      const docKey = `${ext.academic_year ?? "any"}_${ext.pdf_type ?? "unknown"}_${ext.semester ?? "all"}`
-      if (seen.has(docKey)) return false
-      seen.add(docKey)
-      return true
-    })
-  }, [statusFilteredExtractions, latestYearOnly, maxYear, latestOnly])
+    return list.filter((ext) => latestIds.has(ext.id))
+  }, [statusFilteredExtractions, latestYearOnly, maxYear, latestOnly, latestIds])
 
   return (
     <div className="space-y-4">

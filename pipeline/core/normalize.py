@@ -64,13 +64,40 @@ def normalize_room(room: str | None) -> str:
     - Convert fullwidth parentheses （） to halfwidth ().
     - Apply NFKC normalization.
     - Consolidate spaces and strip.
+    - Drop a trailing "教室" suffix from room codes ("21B教室" -> "21B") to match the timetable PDF.
     """
     if not room:
         return ""
     s = unicodedata.normalize("NFKC", room)
     s = s.replace("（", "(").replace("）", ")")
-    s = re.sub(r"[ \t]+", " ", s)
-    return s.strip()
+    s = re.sub(r"[ \t]+", " ", s).strip()
+    return re.sub(r"(?<=[0-9A-Za-z])\s*教室$", "", s)
+
+
+# Canonical changelog column labels, matching the options of the admin ChangelogEditor.
+_CHANGE_FIELD_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("講義コード", "時間割コード", "科目コード"), "講義コード"),
+    (("科目", "講義名"), "科目名"),
+    (("教員", "担当"), "担当者"),
+    (("教室",), "教室"),
+    (("曜日", "時限"), "曜日時限"),
+    (("開講期", "学期"), "学期"),
+    (("対象",), "受講対象"),
+    (("備考",), "備考"),
+)
+
+
+def normalize_change_field(field: str | None) -> str:
+    """Map a changelog "変更箇所" label (e.g. "教室変更", "担当教員追加") to a canonical column name.
+
+    The admin UI shows and edits this value and approval applies it verbatim, so it must already
+    be canonical when extracted. Unknown labels are returned unchanged (shown as custom fields).
+    """
+    s = unicodedata.normalize("NFKC", field or "").strip()
+    for keywords, canonical in _CHANGE_FIELD_RULES:
+        if any(k in s for k in keywords):
+            return canonical
+    return s
 
 
 def normalize_target_note(note: str | None) -> str:

@@ -15,6 +15,7 @@ from pipeline.adapters.gemini import (
     run_with_model_fallback,
 )
 from pipeline.core.normalize import (
+    normalize_change_field,
     normalize_course_name,
     normalize_instructor_name,
     normalize_note,
@@ -428,7 +429,7 @@ def _normalize_change_entry(entry: ChangeEntry) -> ChangeEntry:
     # Normalize field changes
     norm_changes = []
     for fc in entry.changes:
-        field = fc.field
+        field = normalize_change_field(fc.field)
         old_val = fc.old_value
         new_val = fc.new_value
         if "科目" in field:
