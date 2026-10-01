@@ -9,9 +9,13 @@ jobs:
   keepalive:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          gh_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Re-enable scheduled workflows
+        run: |
+          for wf in pipeline.yml keepalive.yml; do
+            gh workflow enable "$wf"
+          done
