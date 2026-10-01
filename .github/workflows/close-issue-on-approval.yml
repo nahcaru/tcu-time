@@ -1,0 +1,41 @@
+name: Close PDF Detection Issue
+
+on:
+  repository_dispatch:
+    types: [extraction-approved]
+  workflow_dispatch:
+    inputs:
+      pdf_url:
+        description: "Approved PDF URL"
+        required: true
+
+jobs:
+  close-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PDF_URL: ${{ github.event.client_payload.pdf_url || inputs.pdf_url }}
+    steps:
+      - name: Close issues for the approved PDF
+        run: |
+          if [ -z "$PDF_URL" ]; then
+            echo "pdf_url is empty; nothing to do"
+            exit 0
+          fi
+          # The detection issue links the PDF as "[label](url)"; match "(url)" exactly so that
+          # "x.pdf" does not match "x-1.pdf".
+          numbers=$(gh issue list --state open --limit 100 --json number,body \
+            | jq -r --arg url "($PDF_URL)" '.[] | select(.body | contains($url)) | .number')
+          if [ -z "$numbers" ]; then
+            echo "No open issue found for $PDF_URL"
+            exit 0
+          fi
+          for n in $numbers; do
+            gh issue close "$n" --reason completed \
+              --comment "管理画面で承認され、本番データへ反映されたため自動的にクローズしました。"
+            echo "Closed #$n"
+          done
