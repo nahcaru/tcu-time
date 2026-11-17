@@ -58,13 +58,13 @@ class DownloadedPdf(bytes):
 
 
 def fetch_text(url: str, *, timeout: int = 30) -> str:
-    response = requests.get(url, timeout=timeout)
+    response = requests.get(url, headers=DEFAULT_HEADERS, timeout=timeout)
     response.raise_for_status()
     return response.text
 
 
 def fetch_bytes(url: str, *, timeout: int = 60) -> DownloadedPdf:
-    response = requests.get(url, timeout=timeout)
+    response = requests.get(url, headers=DEFAULT_HEADERS, timeout=timeout)
     response.raise_for_status()
     last_modified = parse_http_date(response.headers.get("Last-Modified"))
     return DownloadedPdf(response.content, last_modified=last_modified)
