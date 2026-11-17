@@ -21,6 +21,7 @@ from ..monitor import (
     GRAD_DEPARTMENT,
     ADVANCE_SECTION_HEADER,
 )
+from ..adapters.http import DEFAULT_HEADERS
 from ..models import PDFType, Semester
 
 
@@ -64,7 +65,9 @@ class TestFetchPage:
         result = fetch_page("https://example.com")
 
         assert result == "<html><body>Test</body></html>"
-        mock_get.assert_called_once_with("https://example.com", timeout=30)
+        mock_get.assert_called_once_with(
+            "https://example.com", headers=DEFAULT_HEADERS, timeout=30
+        )
 
     @patch("requests.get")
     def test_fetch_page_timeout(self, mock_get) -> None:
@@ -113,7 +116,9 @@ class TestDownloadPdf:
         result = download_pdf("https://example.com/file.pdf")
 
         assert result == pdf_content
-        mock_get.assert_called_once_with("https://example.com/file.pdf", timeout=60)
+        mock_get.assert_called_once_with(
+            "https://example.com/file.pdf", headers=DEFAULT_HEADERS, timeout=60
+        )
 
     @patch("requests.get")
     def test_download_pdf_timeout(self, mock_get) -> None:
